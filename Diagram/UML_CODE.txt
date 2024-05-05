@@ -1,0 +1,43 @@
+flowchart TD
+    A[شروع] -->|ورود به سایت| B(صفحه ورود)
+    B --> C{اطلاعات کاربری}
+    C -->|اطلاعات صحیح| D[صفحه اصلی]
+    C -->|اطلاعات نادرست| E[صفحه ورود]
+    D --> F{تولید محتوا}
+    F -->|بازدیدکنندگان| G[ایجاد پست جدید]
+    G -->|محتوا ویرایش شده| H[نشان دادن پست جدید]
+    H --> I{تعامل با کاربران}
+    I -->|دیدگاه| J[ایجاد دیدگاه]
+    J --> K{نظر دادن}
+    K -->|نظر دادن| L[ذخیره دیدگاه]
+    L -->|ذخیره شدن| M[نمایش دیدگاه]
+    M --> I
+    I -->|تعامل با دیگر کاربران| N[نمایش دیدگاه‌ها]
+    N -->|محتوا ارتقا یافته| G
+#flowchart
+
+.................................
+#state
+stateDiagram-v2
+   [*] --> NotLoggedIn
+NotLoggedIn --> LoggedIn : Log In
+LoggedIn --> NotLoggedIn : Log Out
+LoggedIn --> CreatePost : Create a new post
+LoggedIn --> EditPost : Edit a post
+LoggedIn --> DeletePost : Delete a post
+LoggedIn --> ViewAllPosts : View all posts
+LoggedIn --> ViewSinglePost : View a single post
+CreatePost --> LoggedIn : Cancel
+EditPost --> LoggedIn : Cancel
+DeletePost --> LoggedIn : Cancel
+ViewAllPosts --> LoggedIn : Go Back
+ViewSinglePost --> LoggedIn : Go Back
+
+
+
+
+doc:
+flow:
+به صورت مرحله ای و الگوریتمی نشون میده و ترتیب بندی
+state:
+فعالسازی و نشان وضعیت اون پروژه و شرایطش هست
