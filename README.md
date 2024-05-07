@@ -1,4 +1,3 @@
-
 ```markdown
 # Awesome Blog Project
 
@@ -48,17 +47,17 @@ Welcome to the Awesome Blog Project! This project is built with Django and provi
 ```
 project-root/
 │
-├── sign/           # frontend this Django
+├── sign/           # Django app for user authentication
 │   ├── migrations/    # Database migrations
 │   ├── templates/     # HTML templates
 │   ├── static/        # Static files (CSS, JavaScript)
-│   ├── models.py      # Database models (BlogPost, User, etc.)
+│   ├── models.py      # Database models (User, Profile, etc.)
 │   ├── views.py       # Views for handling HTTP requests
 │   └── ...
 │
-├── admin/           # Django app for react-admin
+├── admin/           # Django app for admin panel (CRUD operations)
 │   ├── migrations/    # Database migrations
-│   ├── models.py      # Database models (CRUD)
+│   ├── models.py      # Database models (BlogPost, Category, etc.)
 │   ├── views.py       # Views for handling HTTP requests
 │   └── ...
 │
@@ -97,3 +96,4 @@ python manage.py runserver
 ## Contributing
 
 Contributions are welcome! Feel free to submit bug reports, feature requests, or pull requests.
+```
