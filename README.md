@@ -9,7 +9,7 @@ The Awesome Blog Project is a blog application designed to facilitate the creati
 - **Backend**: Django
 - **Frontend**: HTML, CSS,JS
 - **Database**: SQLite(Django)
-- - **admin-panel**: react/typescript(react-admin)
+- **admin-panel**: react/typescript(react-admin)
 - **Design Prototyping**: Figma
 
 ## Project Diagram
