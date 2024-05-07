@@ -1,99 +1,53 @@
 ```markdown
-# Awesome Blog Project
+# Online Shop Project
 
-Welcome to the Awesome Blog Project! This project is built with Django and provides a platform for users to create, manage, and share their blog posts.
+Welcome to the Online Shop project! This project is an online shop application built using Flask for the backend, React Admin (Node.js) for the frontend, and frontend technologies such as HTML/CSS.
 
-## Features
+## Project Description
+This project is an online shop application aiming to provide users with a seamless shopping experience. The backend is developed with Flask, handling various functionalities like user authentication, product management, and order processing. The frontend is built using React Admin, a Node.js framework, to create an interactive and user-friendly interface. HTML and CSS are used for the frontend design.
 
-### User Authentication
-- User registration with username, email, and password.
-- Login form with email/username and password.
-- Logout functionality.
+## Technologies Used
+- **Backend**: Flask
+- **Frontend**: React Admin (Node.js), HTML, CSS
+- **Database**: [Sqlite Studio]
+- **Design Prototyping**: Figma
 
-### Blog Post Management
-- Create, update, delete, and view blog posts.
-- Create blog posts with title, content, and optional image.
-- View a list of all blog posts.
-- View individual blog posts with full content.
+## Project Diagram
+[activity-ERD-C4-sequence-state Diagrams by mermaid and generate Ai UML] <br>
+mermaid: [https://mermaid.js.org/](https://mermaid.js.org/)
 
-### User Profile
-- User profile page displaying user information (username, email, profile picture).
-- List of blog posts authored by the user on their profile page.
-- Option to edit user information (username, email, profile picture).
+## Database
+[The database system was designed with Sqlite Studio software] <br>
+download exe Sqlite Studio: [https://sqlitestudio.pl/](https://sqlitestudio.pl/)
 
-### Comment System
-- Add comments to blog posts.
-- Display comments under each blog post.
-- Option to edit and delete own comments.
+## Design Prototyping with Figma
+Figma: [https://www.figma.com/file/TruTLFmDhEWRDnDkBdv3S3/html.to.design-(Community)?type=design&node-id=0-1&mode=design&t=rwYBR4sl5BczAYdt-0](https://www.figma.com/file/TruTLFmDhEWRDnDkBdv3S3/html.to.design-(Community)?type=design&node-id=0-1&mode=design&t=rwYBR4sl5BczAYdt-0)
 
-### Categories and Tags
-- Create, assign, and filter blog posts by categories and tags.
+### Project Setup Guide
 
-### Search Functionality
-- Search blog posts by title, content, or author.
+Follow these simple steps to set up and run the project smoothly:
 
-### Drafts and Publishing
-- Save blog posts as drafts.
-- Publish drafts to make them publicly accessible.
+1. **Install Dependencies**: Start by installing all the necessary libraries using the following command:
+   ```
+   pip install -r requirements.txt
+   ```
 
-## Tools and Technologies Used
-- Django
-- Figma (for UI/UX design)
-- SQLite (as the database)
-- UML (for diagramming)
+2. **Download Node.js**: Navigate to your browser and download Node.js.
 
-## Project Structure
+3. **Install Node Modules**: Next, navigate to the `shop-admin` directory and enter the following command:
+   ```
+   npm i
+   ```
 
-```
-project-root/
-│
-├── sign/           # Django app for user authentication
-│   ├── migrations/    # Database migrations
-│   ├── templates/     # HTML templates
-│   ├── static/        # Static files (CSS, JavaScript)
-│   ├── models.py      # Database models (User, Profile, etc.)
-│   ├── views.py       # Views for handling HTTP requests
-│   └── ...
-│
-├── admin/           # Django app for admin panel (CRUD operations)
-│   ├── migrations/    # Database migrations
-│   ├── models.py      # Database models (BlogPost, Category, etc.)
-│   ├── views.py       # Views for handling HTTP requests
-│   └── ...
-│
-├── db.sqlite3         # SQLite database file
-└── ...
-```
+4. **Run the Application**: To run the application, navigate to the project's root directory and enter the following command:
+   ```
+   python app.py
+   ```
 
-## How to Run the Project
+5. **Launch Admin Panel**: Then, to launch the admin panel, go to the `shop-admin` directory and enter the following command:
+   ```
+   npm run dev
+   ```
 
-1. Clone the repository:
-
-```bash
-git clone https://github.com/Asajadafsar/Blog.git
-```
-
-2. Navigate to the project directory:
-
-```bash
-cd awesome-blog-project
-```
-
-3. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-4. Run the Django development server:
-
-```bash
-python manage.py runserver
-```
-
-5. Open your web browser and go to `http://localhost:8000` to view the website.
-
-## Contributing
-
-Contributions are welcome! Feel free to submit bug reports, feature requests, or pull requests.
+That's it! You can now retrieve the admin panel and website URLs upon execution and load them locally with different ports. Enjoy exploring the project!
 ```
