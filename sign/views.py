@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
-from .models import User,Category,BlogPost
+from .models import User,Category,BlogPost,Comment
 import hashlib
 import jwt
 import json
@@ -205,6 +205,8 @@ def user_posts(request):
 
 
 
+
+#display_post and comment
 @csrf_exempt
 def display_post(request, post_id):
     if request.method == 'GET':
@@ -212,20 +214,38 @@ def display_post(request, post_id):
             # Get the post with the given id
             post = BlogPost.objects.get(post_id=post_id)
             
-            # Prepare the response data
+            # Fetch comments associated with the post
+            comments = Comment.objects.filter(post_id=post_id)
+            
+            # Serialize comments into JSON format
+            serialized_comments = []
+            for comment in comments:
+                comment_data = {
+                    'comment_id': comment.comment_id,
+                    'content': comment.content,
+                    'user_id': comment.user_id.username,
+                    'created_at': comment.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                }
+                serialized_comments.append(comment_data)
+            
+            # Prepare the response data for the post and its comments
             post_data = {
                 'title': post.title,
                 'content': post.content,
-                'image': post.image.url if post.image else None,  # Assuming image is stored in MEDIA_ROOT
-                'created_at': post.created_at.strftime("%Y-%m-%d %H:%M:%S")  # Format the datetime
+                'image': post.image.url if post.image else None,
+                'created_at': post.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                'comments': serialized_comments  # Include comments in the response
             }
             
-            # Return the response
-            return JsonResponse(post_data)
+            # Return the response with post details and comments
+            return JsonResponse({'post': post_data})
+        
         except BlogPost.DoesNotExist:
             return JsonResponse({'error': 'Post not found'}, status=404)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
 
 
 
@@ -346,3 +366,123 @@ def delete_post(request, post_id):
             return JsonResponse({'error': 'Post not found'}, status=404)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+
+
+
+
+@csrf_exempt
+@token_required
+def add_comment(request, post_id):
+    if request.method == 'POST':
+        # Get the authenticated user
+        user = request.user
+        
+        # Parse JSON data from request body
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+
+        # Extract content from JSON
+        content = data.get('content')
+        
+        # Check if content is provided
+        if not content:
+            return JsonResponse({'error': 'Content is required'}, status=400)
+
+        try:
+            # Check if the post exists
+            post = BlogPost.objects.get(post_id=post_id)
+        except BlogPost.DoesNotExist:
+            return JsonResponse({'error': 'Post not found'}, status=404)
+
+        try:
+            # Create new comment
+            new_comment = Comment.objects.create(
+                content=content,
+                user_id=user,
+                post_id=post
+            )
+            return JsonResponse({'success': 'Comment added successfully'}, status=201)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+#edit comment
+@csrf_exempt
+@token_required
+def edit_comment(request, comment_id):
+    if request.method == 'PUT':
+        # Get the authenticated user
+        user = request.user
+
+        # Parse JSON data from request body
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+
+        # Extract content from JSON
+        content = data.get('content')
+
+        # Check if content is provided
+        if not content:
+            return JsonResponse({'error': 'Content is required'}, status=400)
+
+        try:
+            # Get the comment to edit
+            comment = Comment.objects.get(comment_id=comment_id)
+
+            # Check if the authenticated user is the owner of the comment
+            if comment.user_id != user:
+                return JsonResponse({'error': 'You are not allowed to edit this comment'}, status=403)
+
+            # Update the comment content
+            comment.content = content
+            comment.save()
+
+            return JsonResponse({'success': 'Comment updated successfully'}, status=200)
+
+        except Comment.DoesNotExist:
+            return JsonResponse({'error': 'Comment not found'}, status=404)
+
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+#delete comment
+@csrf_exempt
+@token_required
+def delete_comment(request, comment_id):
+    if request.method == 'DELETE':
+        # Get the authenticated user
+        user = request.user
+
+        try:
+            # Get the comment to delete
+            comment = Comment.objects.get(comment_id=comment_id)
+
+            # Check if the authenticated user is the owner of the comment
+            if comment.user_id != user:
+                return JsonResponse({'error': 'You are not allowed to delete this comment'}, status=403)
+
+            # Delete the comment
+            comment.delete()
+
+            return JsonResponse({'success': 'Comment deleted successfully'})
+
+        except Comment.DoesNotExist:
+            return JsonResponse({'error': 'Comment not found'}, status=404)
+
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+
