@@ -1,27 +1,25 @@
-```markdown
-# Online Shop Project
+# Awesome Blog Project
 
-Welcome to the Online Shop project! This project is an online shop application built using Flask for the backend, React Admin (Node.js) for the frontend, and frontend technologies such as HTML/CSS.
+Welcome to the Awesome Blog Project! This project is built with Django and provides a platform for users to create, manage, and share their blog posts.
 
 ## Project Description
-This project is an online shop application aiming to provide users with a seamless shopping experience. The backend is developed with Flask, handling various functionalities like user authentication, product management, and order processing. The frontend is built using React Admin, a Node.js framework, to create an interactive and user-friendly interface. HTML and CSS are used for the frontend design.
+The Awesome Blog Project is a blog application designed to facilitate the creation, management, and sharing of blog posts. It offers a user-friendly interface for users to interact with the platform seamlessly.
 
 ## Technologies Used
-- **Backend**: Flask
-- **Frontend**: React Admin (Node.js), HTML, CSS
-- **Database**: [Sqlite Studio]
+- **Backend**: Django
+- **Frontend**: HTML, CSS,JS
+- **Database**: SQLite(Django)
+- - **admin-panel**: react/typescript(react-admin)
 - **Design Prototyping**: Figma
 
 ## Project Diagram
-[activity-ERD-C4-sequence-state Diagrams by mermaid and generate Ai UML] <br>
-mermaid: [https://mermaid.js.org/](https://mermaid.js.org/)
+[Activity-ERD-C4-Sequence-State Diagrams by mermaid and generate AI UML](https://mermaid.js.org/)
 
 ## Database
-[The database system was designed with Sqlite Studio software] <br>
-download exe Sqlite Studio: [https://sqlitestudio.pl/](https://sqlitestudio.pl/)
+The database system was designed with SQLite Studio software. You can download the executable file for SQLite Studio [here](https://sqlitestudio.pl/).
 
 ## Design Prototyping with Figma
-Figma: [https://www.figma.com/file/TruTLFmDhEWRDnDkBdv3S3/html.to.design-(Community)?type=design&node-id=0-1&mode=design&t=rwYBR4sl5BczAYdt-0](https://www.figma.com/file/TruTLFmDhEWRDnDkBdv3S3/html.to.design-(Community)?type=design&node-id=0-1&mode=design&t=rwYBR4sl5BczAYdt-0)
+[Figma Design Prototype]()
 
 ### Project Setup Guide
 
@@ -48,6 +46,3 @@ Follow these simple steps to set up and run the project smoothly:
    ```
    npm run dev
    ```
-
-That's it! You can now retrieve the admin panel and website URLs upon execution and load them locally with different ports. Enjoy exploring the project!
-```
