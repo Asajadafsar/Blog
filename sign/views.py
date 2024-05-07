@@ -1,11 +1,12 @@
 from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
-from .models import User
+from .models import User,Category,BlogPost
 import hashlib
 import jwt
 import json
 from django.views.decorators.csrf import csrf_exempt
 from functools import wraps
+from django.core import serializers
 
 
 
@@ -150,7 +151,7 @@ def edit_profile(request):
         return HttpResponse('Method not allowed!', status=405)
 
 
-# Reset password for authenticated user
+# Reset password
 @csrf_exempt
 @token_required
 def reset_password(request):
@@ -176,3 +177,172 @@ def reset_password(request):
             return HttpResponse('Required fields are missing!', status=400)
     else:
         return HttpResponse('Method not allowed!', status=405)
+
+
+
+#view posts user
+@csrf_exempt
+@token_required
+def user_posts(request):
+    if request.method == 'GET':
+        user = request.user
+        posts = BlogPost.objects.filter(user_id=user.user_id)
+        
+        # Serialize posts into JSON format with required fields
+        serialized_posts = []
+        for post in posts:
+            post_data = {
+                'id': post.post_id,
+                'title': post.title,
+                'category': post.category.name,
+                'image': post.image.url if post.image else None,
+            }
+            serialized_posts.append(post_data)
+        
+        return JsonResponse({'posts': serialized_posts})
+    else:
+        return HttpResponse('Method not allowed!', status=405)
+
+
+
+@csrf_exempt
+def display_post(request, post_id):
+    if request.method == 'GET':
+        try:
+            # Get the post with the given id
+            post = BlogPost.objects.get(post_id=post_id)
+            
+            # Prepare the response data
+            post_data = {
+                'title': post.title,
+                'content': post.content,
+                'image': post.image.url if post.image else None,  # Assuming image is stored in MEDIA_ROOT
+                'created_at': post.created_at.strftime("%Y-%m-%d %H:%M:%S")  # Format the datetime
+            }
+            
+            # Return the response
+            return JsonResponse(post_data)
+        except BlogPost.DoesNotExist:
+            return JsonResponse({'error': 'Post not found'}, status=404)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+#add post
+@csrf_exempt
+@token_required
+def add_post(request):
+    if request.method == 'POST':
+        # Get user ID from the token
+        user_id = request.user.user_id
+        
+        # Parse JSON data from request body
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+
+        # Extract data from JSON
+        title = data.get('title')
+        content = data.get('content')
+        category_name = data.get('category_name')
+        
+        # Check if required fields are present
+        if not all([title, content, category_name]):
+            return JsonResponse({'error': 'Missing required fields'}, status=400)
+
+        # Extract image file from request.FILES
+        image = request.FILES.get('image')
+
+        try:
+            # Fetch category object based on category name
+            category = Category.objects.get(name=category_name)
+        except Category.DoesNotExist:
+            return JsonResponse({'error': 'Category does not exist'}, status=400)
+
+        try:
+            # Create new blog post
+            new_post = BlogPost.objects.create(
+                title=title,
+                content=content,
+                image=image,
+                user_id=user_id,
+                category=category
+            )
+            return JsonResponse({'success': 'Post added successfully'}, status=201)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+# Edit existing blog posts
+@csrf_exempt
+@token_required
+def edit_post(request, post_id):
+    if request.method == 'PUT':
+        # Get user ID from the token
+        user_id = request.user.user_id
+        
+        # Parse JSON data from request body
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+
+        # Extract data from JSON
+        title = data.get('title')
+        content = data.get('content')
+        category_name = data.get('category_name')
+        
+        # Check if required fields are present
+        if not any([title, content, category_name]):
+            return JsonResponse({'error': 'At least one field to edit is required'}, status=400)
+
+        # Fetch the post to edit
+        try:
+            post = BlogPost.objects.get(post_id=post_id, user_id=user_id)
+        except BlogPost.DoesNotExist:
+            return JsonResponse({'error': 'Post not found'}, status=404)
+
+        # Update fields if provided
+        if title:
+            post.title = title
+        if content:
+            post.content = content
+        if category_name:
+            try:
+                category = Category.objects.get(name=category_name)
+                post.category = category
+            except Category.DoesNotExist:
+                return JsonResponse({'error': 'Category does not exist'}, status=400)
+
+        # Save the changes
+        post.save()
+
+        return JsonResponse({'success': 'Post updated successfully', 'post_id': post.post_id}, status=200)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+
+
+
+#delete post
+@csrf_exempt
+@token_required
+def delete_post(request, post_id):
+    if request.method == 'DELETE':
+        user = request.user
+        try:
+            # Get the post to delete
+            post = BlogPost.objects.get(post_id=post_id, user_id=user.user_id)
+            post.delete()
+            return JsonResponse({'success': 'Post deleted successfully'})
+        except BlogPost.DoesNotExist:
+            return JsonResponse({'error': 'Post not found'}, status=404)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
