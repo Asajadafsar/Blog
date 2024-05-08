@@ -45,34 +45,42 @@ def token_required(view_func):
 def register_user(request):
     if request.method == 'POST':
         try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return HttpResponse('Invalid JSON data!', status=400)
-        
-        required_fields = ['username', 'password', 'email', 'phone_number']
-        if all(field in data for field in required_fields):
-            username = data['username']
-            password = data['password']
-            email = data['email']
-            phone_number = data['phone_number']
+            # Parse form data
+            username = request.POST.get('username')
+            password = request.POST.get('password')
+            email = request.POST.get('email')
+            phone_number = request.POST.get('phone_number')
 
+            # Check if all required fields are provided
+            if not all([username, password, email, phone_number]):
+                return HttpResponse('One or more required fields are missing!', status=400)
+
+            # Check if the username already exists
             if User.objects.filter(username=username).exists():
                 return HttpResponse('User already exists!', status=409)
 
-            if any(data[field] == '' for field in required_fields):
-                return HttpResponse('One or more required fields are empty!', status=400)
-
+            # Hash the password
             hashed_password = hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+            # Save the user
             user = User(username=username, password=hashed_password, email=email, phone_number=phone_number)
             user.save()
 
+            # Check if profile picture is provided
+            if 'profile_picture' in request.FILES:
+                profile_picture = request.FILES['profile_picture']
+                # Save the profile picture
+                user.profile_picture.save(profile_picture.name, profile_picture, save=True)
+
             # Generate JWT token
             token = jwt.encode({'user_id': user.user_id}, SECRET_KEY, algorithm='HS256')
-            return JsonResponse({'token': token.decode('utf-8')})
-        else:
-            return HttpResponse('Required fields are missing!', status=400)
+            return JsonResponse({'token': token})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
     else:
         return HttpResponse('Method not allowed!', status=405)
+
+
 
 # login user
 @csrf_exempt
@@ -124,36 +132,66 @@ def login_user(request):
 def profile(request):
     if request.method == 'GET':
         user = request.user
-        return JsonResponse({'username': user.username, 'email': user.email, 'phone_number': user.phone_number, 'role': user.role})
+        profile_picture_url = user.profile_picture.url if user.profile_picture else None
+        return JsonResponse({
+            'username': user.username,
+            'email': user.email,
+            'phone_number': user.phone_number,
+            'profile_picture': profile_picture_url,
+            'role': user.role
+        })
     else:
         return HttpResponse('Method not allowed!', status=405)
 
 
 
-# Edit profile
+# # Edit profile
+# @csrf_exempt
+# @token_required
+# def edit_profile(request):
+#     if request.method == 'POST':
+#         try:
+#             data = json.loads(request.body)
+#         except json.JSONDecodeError:
+#             return HttpResponse('Invalid JSON data!', status=400)
+        
+#         user = request.user
+
+#         # Update profile information
+#         if 'email' in data:
+#             user.email = data['email']
+#         if 'phone_number' in data:
+#             user.phone_number = data['phone_number']
+        
+#         user.save()
+
+#         return HttpResponse('Profile updated successfully!')
+#     else:
+#         return HttpResponse('Method not allowed!', status=405)
+
+#edit profile
 @csrf_exempt
 @token_required
 def edit_profile(request):
     if request.method == 'POST':
         try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return HttpResponse('Invalid JSON data!', status=400)
-        
-        user = request.user
+            # Get the authenticated user
+            user = request.user
 
-        # Update profile information
-        if 'email' in data:
-            user.email = data['email']
-        if 'phone_number' in data:
-            user.phone_number = data['phone_number']
-        
-        user.save()
+            # Check if profile picture is provided for editing
+            if 'new_profile_picture' in request.FILES:
+                new_profile_picture = request.FILES['new_profile_picture']
+                # Save the new profile picture
+                user.profile_picture.delete()  # Delete the old profile picture
+                user.profile_picture.save(new_profile_picture.name, new_profile_picture, save=True)
 
-        return HttpResponse('Profile updated successfully!')
+                return JsonResponse({'success': 'Profile picture updated successfully'})
+            else:
+                return HttpResponse('No profile picture provided for editing!', status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
     else:
         return HttpResponse('Method not allowed!', status=405)
-
 
 
 
@@ -270,52 +308,39 @@ def display_post(request, post_id):
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
-# add post
+
+#add post
 @csrf_exempt
 @token_required
 def add_post(request):
     if request.method == 'POST':
-        # Get user ID from the token
-        user_id = request.user.user_id
-        
-        # Parse JSON data from request body
         try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+            # Parse form data
+            title = request.POST.get('title')
+            content = request.POST.get('content')
+            category_name = request.POST.get('category_name')
+            tags = request.POST.getlist('tags')
+            image = request.FILES.get('image')
 
-        # Extract data from JSON
-        title = data.get('title')
-        content = data.get('content')
-        category_name = data.get('category_name')
-        tags = data.get('tags', [])  # Get tags as a list
-        
-        # Check if required fields are present
-        if not all([title, content, category_name]):
-            return JsonResponse({'error': 'Missing required fields'}, status=400)
+            # Check if required fields are provided
+            if not all([title, content, category_name]):
+                return JsonResponse({'error': 'One or more required fields are missing'}, status=400)
 
-        # Extract image file from request.FILES
-        image = request.FILES.get('image')
+            # Get user ID from the token
+            user_id = request.user.user_id
 
-        try:
-            # Fetch category object based on category name
-            category = Category.objects.get(name=category_name)
-        except Category.DoesNotExist:
-            return JsonResponse({'error': 'Category does not exist'}, status=400)
-
-        try:
             # Fetch user object based on user_id
             user = User.objects.get(user_id=user_id)
-        except User.DoesNotExist:
-            return JsonResponse({'error': 'User does not exist'}, status=400)
 
-        try:
+            # Fetch category object based on category name
+            category, created = Category.objects.get_or_create(name=category_name)
+
             # Create new blog post
             new_post = BlogPost.objects.create(
                 title=title,
                 content=content,
                 image=image,
-                user=user,  # Use user instance instead of user_id
+                user=user,
                 category=category
             )
 
@@ -323,7 +348,7 @@ def add_post(request):
             for tag_name in tags:
                 # Check if the tag already exists, if not, create it
                 tag, created = Tag.objects.get_or_create(name=tag_name, user_id=user, post_id=new_post)
-            
+
             return JsonResponse({'success': 'Post added successfully'}, status=201)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
@@ -332,23 +357,15 @@ def add_post(request):
 
 
 
-
-
-# Edit existing blog posts
+# edit post
 @csrf_exempt
 @token_required
 def edit_post(request, post_id):
-    if request.method == 'PUT':
+    if request.method == 'POST':
         # Get user ID from the token
         user_id = request.user.user_id
         
-        # Parse JSON data from request body
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
-
-        # Fetch the post to edit
+        # Check if the post exists
         try:
             post = BlogPost.objects.get(post_id=post_id, user_id=user_id)
         except BlogPost.DoesNotExist:
@@ -359,36 +376,46 @@ def edit_post(request, post_id):
             return JsonResponse({'error': 'Post is not active'}, status=403)
 
         # Update fields if provided
-        if 'title' in data:
-            post.title = data['title']
-        if 'content' in data:
-            post.content = data['content']
-        if 'category_name' in data:
+        if 'title' in request.POST:
+            post.title = request.POST['title']
+        if 'content' in request.POST:
+            post.content = request.POST['content']
+        if 'category_name' in request.POST:
+            category_name = request.POST['category_name']
             try:
-                category = Category.objects.get(name=data['category_name'])
+                category = Category.objects.get(name=category_name)
                 post.category = category
             except Category.DoesNotExist:
                 return JsonResponse({'error': 'Category does not exist'}, status=400)
-        
-        # Add new tags
-        if 'add_tag' in data:
-            for tag_name in data['add_tag']:
-                # Get or create User instance for the tag
-                user_instance = User.objects.get(user_id=user_id)
-                tag, created = Tag.objects.get_or_create(name=tag_name, user_id=user_instance, post_id=post)
 
-        # Delete tags
-        if 'delete_tag' in data:
-            for tag_name in data['delete_tag']:
-                try:
-                    tag = Tag.objects.get(name=tag_name, user_id=user_id, post_id=post)
-                    tag.delete()
-                except Tag.DoesNotExist:
-                    pass  # Tag doesn't exist, no need to delete
+        # Update image if provided
+        if 'image' in request.FILES:
+            post.image.delete()  # Delete the previous image
+            post.image = request.FILES['image']
         
-        # Save the changes
+        # Save the changes to the post
         post.save()
 
+        # Fetch the User object based on user_id
+        user = User.objects.get(user_id=user_id)
+
+        # Add new tags
+        add_tags = request.POST.getlist('add_tag')
+        for tag_name in add_tags:
+            # Ensure tag name is not empty
+            if tag_name:
+                # Create the tag if it doesn't exist
+                tag, created = Tag.objects.get_or_create(name=tag_name, user_id=user, post_id=post)
+                # Optionally, you can set status or other fields for the tag here if needed
+
+        # Delete tags
+        delete_tags = request.POST.getlist('delete_tag')
+        for tag_name in delete_tags:
+            # Ensure tag name is not empty
+            if tag_name:
+                # Delete the tag if it exists
+                Tag.objects.filter(name=tag_name, user_id=user, post_id=post_id).delete()
+        
         return JsonResponse({'success': 'Post updated successfully'}, status=200)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
