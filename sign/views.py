@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
-from .models import User,Category,BlogPost,Comment
+from .models import User,Category,BlogPost,Comment,Tag
 import hashlib
 import jwt
 import json
@@ -179,7 +179,6 @@ def reset_password(request):
         return HttpResponse('Method not allowed!', status=405)
 
 
-
 #view posts user
 @csrf_exempt
 @token_required
@@ -191,11 +190,17 @@ def user_posts(request):
         # Serialize posts into JSON format with required fields
         serialized_posts = []
         for post in posts:
+            # Get tags associated with the post
+            tags = Tag.objects.filter(post_id=post)
+            # Extract tag names
+            tag_names = [tag.name for tag in tags]
             post_data = {
                 'id': post.post_id,
                 'title': post.title,
                 'category': post.category.name,
                 'image': post.image.url if post.image else None,
+                'tags': tag_names,
+                'status': post.status  # Include the status field in the response
             }
             serialized_posts.append(post_data)
         
@@ -212,10 +217,13 @@ def display_post(request, post_id):
     if request.method == 'GET':
         try:
             # Get the post with the given id
-            post = BlogPost.objects.get(post_id=post_id)
+            post = BlogPost.objects.get(post_id=post_id, status='active')  # Check if the status is 'active'
             
             # Fetch comments associated with the post
             comments = Comment.objects.filter(post_id=post_id)
+            
+            # Fetch tags associated with the post
+            tags = Tag.objects.filter(post_id=post)
             
             # Serialize comments into JSON format
             serialized_comments = []
@@ -228,28 +236,35 @@ def display_post(request, post_id):
                 }
                 serialized_comments.append(comment_data)
             
-            # Prepare the response data for the post and its comments
+            # Serialize tags into JSON format
+            serialized_tags = []
+            for tag in tags:
+                tag_data = {
+                    'tag_id': tag.tag_id,
+                    'name': tag.name
+                }
+                serialized_tags.append(tag_data)
+            
+            # Prepare the response data for the post, its comments, and tags
             post_data = {
                 'title': post.title,
                 'content': post.content,
                 'image': post.image.url if post.image else None,
                 'created_at': post.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                'comments': serialized_comments  # Include comments in the response
+                'comments': serialized_comments,  # Include comments in the response
+                'tags': serialized_tags  # Include tags in the response
             }
             
-            # Return the response with post details and comments
+            # Return the response with post details, comments, and tags
             return JsonResponse({'post': post_data})
         
         except BlogPost.DoesNotExist:
-            return JsonResponse({'error': 'Post not found'}, status=404)
+            return JsonResponse({'error': 'Post not found or not published'}, status=404)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
-
-
-
-#add post
+# add post
 @csrf_exempt
 @token_required
 def add_post(request):
@@ -267,6 +282,7 @@ def add_post(request):
         title = data.get('title')
         content = data.get('content')
         category_name = data.get('category_name')
+        tags = data.get('tags', [])  # Get tags as a list
         
         # Check if required fields are present
         if not all([title, content, category_name]):
@@ -282,19 +298,33 @@ def add_post(request):
             return JsonResponse({'error': 'Category does not exist'}, status=400)
 
         try:
+            # Fetch user object based on user_id
+            user = User.objects.get(user_id=user_id)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User does not exist'}, status=400)
+
+        try:
             # Create new blog post
             new_post = BlogPost.objects.create(
                 title=title,
                 content=content,
                 image=image,
-                user_id=user_id,
+                user=user,  # Use user instance instead of user_id
                 category=category
             )
+
+            # Add tags to the post
+            for tag_name in tags:
+                # Check if the tag already exists, if not, create it
+                tag, created = Tag.objects.get_or_create(name=tag_name, user_id=user, post_id=new_post)
+            
             return JsonResponse({'success': 'Post added successfully'}, status=201)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
 
 
 
@@ -312,37 +342,48 @@ def edit_post(request, post_id):
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
 
-        # Extract data from JSON
-        title = data.get('title')
-        content = data.get('content')
-        category_name = data.get('category_name')
-        
-        # Check if required fields are present
-        if not any([title, content, category_name]):
-            return JsonResponse({'error': 'At least one field to edit is required'}, status=400)
-
         # Fetch the post to edit
         try:
             post = BlogPost.objects.get(post_id=post_id, user_id=user_id)
         except BlogPost.DoesNotExist:
             return JsonResponse({'error': 'Post not found'}, status=404)
 
+        # Check if the post is active
+        if post.status != 'active':
+            return JsonResponse({'error': 'Post is not active'}, status=403)
+
         # Update fields if provided
-        if title:
-            post.title = title
-        if content:
-            post.content = content
-        if category_name:
+        if 'title' in data:
+            post.title = data['title']
+        if 'content' in data:
+            post.content = data['content']
+        if 'category_name' in data:
             try:
-                category = Category.objects.get(name=category_name)
+                category = Category.objects.get(name=data['category_name'])
                 post.category = category
             except Category.DoesNotExist:
                 return JsonResponse({'error': 'Category does not exist'}, status=400)
+        
+        # Add new tags
+        if 'add_tag' in data:
+            for tag_name in data['add_tag']:
+                # Get or create User instance for the tag
+                user_instance = User.objects.get(user_id=user_id)
+                tag, created = Tag.objects.get_or_create(name=tag_name, user_id=user_instance, post_id=post)
 
+        # Delete tags
+        if 'delete_tag' in data:
+            for tag_name in data['delete_tag']:
+                try:
+                    tag = Tag.objects.get(name=tag_name, user_id=user_id, post_id=post)
+                    tag.delete()
+                except Tag.DoesNotExist:
+                    pass  # Tag doesn't exist, no need to delete
+        
         # Save the changes
         post.save()
 
-        return JsonResponse({'success': 'Post updated successfully', 'post_id': post.post_id}, status=200)
+        return JsonResponse({'success': 'Post updated successfully'}, status=200)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
@@ -350,8 +391,7 @@ def edit_post(request, post_id):
 
 
 
-
-#delete post
+# Delete post
 @csrf_exempt
 @token_required
 def delete_post(request, post_id):
@@ -360,6 +400,9 @@ def delete_post(request, post_id):
         try:
             # Get the post to delete
             post = BlogPost.objects.get(post_id=post_id, user_id=user.user_id)
+            # Delete associated tags
+            Tag.objects.filter(post_id=post_id).delete()
+            # Delete the post
             post.delete()
             return JsonResponse({'success': 'Post deleted successfully'})
         except BlogPost.DoesNotExist:
@@ -371,8 +414,7 @@ def delete_post(request, post_id):
 
 
 
-
-
+#add comment
 @csrf_exempt
 @token_required
 def add_comment(request, post_id):
@@ -484,5 +526,129 @@ def delete_comment(request, comment_id):
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
+
+
+# add deraf post
+@csrf_exempt
+@token_required
+def add_deraf_post(request):
+    if request.method == 'POST':
+        # Get user ID from the token
+        user_id = request.user.user_id
+        
+        # Parse JSON data from request body
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+
+        # Extract data from JSON
+        title = data.get('title')
+        content = data.get('content')
+        category_name = data.get('category_name')
+        tags = data.get('tags', [])  # Get tags as a list
+        
+        # Check if required fields are present
+        if not all([title, content, category_name]):
+            return JsonResponse({'error': 'Missing required fields'}, status=400)
+
+        # Extract image file from request.FILES
+        image = request.FILES.get('image')
+
+        try:
+            # Fetch category object based on category name
+            category = Category.objects.get(name=category_name)
+        except Category.DoesNotExist:
+            return JsonResponse({'error': 'Category does not exist'}, status=400)
+
+        try:
+            # Fetch user object based on user_id
+            user = User.objects.get(user_id=user_id)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User does not exist'}, status=400)
+
+        try:
+            # Create new blog post with status as 'draft'
+            new_post = BlogPost.objects.create(
+                title=title,
+                content=content,
+                image=image,
+                user=user,  # Use user instance instead of user_id
+                category=category,
+                status='draft'  # Set status to 'draft'
+            )
+
+            # Add tags to the post with status as 'draft'
+            for tag_name in tags:
+                # Check if the tag already exists, if not, create it
+                tag, created = Tag.objects.get_or_create(name=tag_name, user_id=user, post_id=new_post, status='draft')
+            
+            return JsonResponse({'success': 'Draft post added successfully'}, status=201)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+
+# edit_draft_post
+@csrf_exempt
+@token_required
+def edit_draft_post(request, post_id):
+    if request.method == 'PUT':
+        # Get user ID from the token
+        user_id = request.user.user_id
+        
+        # Parse JSON data from request body
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+
+        # Fetch the post to edit
+        try:
+            post = BlogPost.objects.get(post_id=post_id, user_id=user_id)
+        except BlogPost.DoesNotExist:
+            return JsonResponse({'error': 'Post not found'}, status=404)
+
+        # Check if the post is active
+        if post.status == 'active':
+            return JsonResponse({'error': 'Post is not Draft'}, status=403)
+
+        # Update fields if provided
+        if 'title' in data:
+            post.title = data['title']
+        if 'content' in data:
+            post.content = data['content']
+        if 'category_name' in data:
+            try:
+                category = Category.objects.get(name=data['category_name'])
+                post.category = category
+            except Category.DoesNotExist:
+                return JsonResponse({'error': 'Category does not exist'}, status=400)
+        
+        # Add new tags
+        if 'add_tag' in data:
+            for tag_name in data['add_tag']:
+                # Get or create User instance for the tag
+                user_instance = User.objects.get(user_id=user_id)
+                tag, created = Tag.objects.get_or_create(name=tag_name, user_id=user_instance, post_id=post)
+
+        # Delete tags
+        if 'delete_tag' in data:
+            for tag_name in data['delete_tag']:
+                try:
+                    tag = Tag.objects.get(name=tag_name, user_id=user_id, post_id=post)
+                    tag.delete()
+                except Tag.DoesNotExist:
+                    pass  # Tag doesn't exist, no need to delete
+        
+        # Save the changes
+        post.save()
+
+        return JsonResponse({'success': 'Post Draft updated successfully'}, status=200)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
