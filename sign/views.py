@@ -806,7 +806,7 @@ def search_active_posts(request):
 
 
 
-#Filter blog posts by category or tag.
+#Filter blog posts by category
 @csrf_exempt
 def get_posts_by_category(request, category_id):
     if request.method == 'GET':
@@ -823,13 +823,9 @@ def get_posts_by_category(request, category_id):
                 post_data = {
                     'post_id': post.post_id,
                     'title': post.title,
-                    'content': post.content,
                     'image': post.image.url if post.image else None,
-                    'created_at': post.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                    'updated_at': post.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
                     'user': post.user.username,
                     'category': post.category.name,
-                    'status': post.status
                 }
                 serialized_posts.append(post_data)
 
@@ -838,6 +834,42 @@ def get_posts_by_category(request, category_id):
             return JsonResponse({'error': 'Category not found'}, status=404)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+
+
+
+
+#Filter blog posts by tag
+@csrf_exempt
+def get_posts_by_tag(request, tag_name):
+    if request.method == 'GET':
+        # Find all tags with the given name
+        tags = Tag.objects.filter(name=tag_name)
+
+        # Check if any tags were found
+        if tags.exists():
+            # Find all posts related to the tags
+            posts = BlogPost.objects.filter(tag__in=tags, status='active')
+
+            # Serialize posts into JSON format
+            serialized_posts = []
+            for post in posts:
+                post_data = {
+                    'title': post.title,
+                    'image': post.image.url if post.image else None,
+                    'user': post.user.username,
+                    'category': post.category.name
+                }
+                serialized_posts.append(post_data)
+
+            return JsonResponse({'posts': serialized_posts})
+        else:
+            return JsonResponse({'error': 'Tag not found'}, status=404)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
 
 
 
