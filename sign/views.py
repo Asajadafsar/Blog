@@ -7,6 +7,7 @@ import json
 from django.views.decorators.csrf import csrf_exempt
 from functools import wraps
 from django.core import serializers
+from django.db.models import Q
 
 
 
@@ -35,6 +36,9 @@ def token_required(view_func):
         return view_func(request, *args, **kwargs)
 
     return wrapper
+
+
+
 
 # register user
 @csrf_exempt
@@ -149,6 +153,8 @@ def edit_profile(request):
         return HttpResponse('Profile updated successfully!')
     else:
         return HttpResponse('Method not allowed!', status=405)
+
+
 
 
 # Reset password
@@ -436,10 +442,10 @@ def add_comment(request, post_id):
             return JsonResponse({'error': 'Content is required'}, status=400)
 
         try:
-            # Check if the post exists
-            post = BlogPost.objects.get(post_id=post_id)
+            # Check if the post exists and is active
+            post = BlogPost.objects.get(post_id=post_id, status='active')
         except BlogPost.DoesNotExist:
-            return JsonResponse({'error': 'Post not found'}, status=404)
+            return JsonResponse({'error': 'Active post not found'}, status=404)
 
         try:
             # Create new comment
@@ -453,6 +459,9 @@ def add_comment(request, post_id):
             return JsonResponse({'error': str(e)}, status=500)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
 
 
 #edit comment
@@ -650,5 +659,186 @@ def edit_draft_post(request, post_id):
         return JsonResponse({'success': 'Post Draft updated successfully'}, status=200)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+
+# Publish draft post
+@csrf_exempt
+@token_required
+def publish_draft_post(request, post_id):
+    if request.method == 'PUT':
+        # Get the authenticated user
+        user = request.user
+
+        try:
+            # Get the draft post
+            post = BlogPost.objects.get(post_id=post_id, user_id=user.user_id, status='draft')
+        except BlogPost.DoesNotExist:
+            return JsonResponse({'error': 'Draft post not found'}, status=404)
+
+        # Change the status of the draft post to 'active' (published)
+        post.status = 'active'
+        post.save()
+
+        # Update the status of tags associated with the post to 'active'
+        tags = Tag.objects.filter(post_id=post)
+        tags.update(status='active')
+
+        return JsonResponse({'success': 'Draft post published successfully'}, status=200)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+# Unpublish post (change status to draft)
+@csrf_exempt
+@token_required
+def unpublish_post(request, post_id):
+    if request.method == 'PUT':
+        # Get the authenticated user
+        user = request.user
+
+        try:
+            # Get the active post
+            post = BlogPost.objects.get(post_id=post_id, user_id=user.user_id, status='active')
+        except BlogPost.DoesNotExist:
+            return JsonResponse({'error': 'Active post not found'}, status=404)
+
+        # Change the status of the post to 'draft'
+        post.status = 'draft'
+        post.save()
+
+        # Update the status of tags associated with the post to 'draft'
+        tags = Tag.objects.filter(post_id=post)
+        tags.update(status='draft')
+
+        return JsonResponse({'success': 'Post unpublished successfully'}, status=200)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+# Display draft posts with their tags
+@csrf_exempt
+def display_draft_posts(request):
+    if request.method == 'GET':
+        # Get all draft posts
+        draft_posts = BlogPost.objects.filter(status='draft')
+
+        # Serialize draft posts and their tags
+        serialized_draft_posts = []
+        for post in draft_posts:
+            # Get tags associated with the post
+            tags = Tag.objects.filter(post_id=post)
+
+            # Serialize tags into JSON format
+            serialized_tags = []
+            for tag in tags:
+                tag_data = {
+                    'tag_id': tag.tag_id,
+                    'name': tag.name
+                }
+                serialized_tags.append(tag_data)
+
+            # Prepare the response data for the draft post and its tags
+            post_data = {
+                'post_id': post.post_id,
+                'title': post.title,
+                'content': post.content,
+                'tags': serialized_tags
+            }
+
+            serialized_draft_posts.append(post_data)
+
+        return JsonResponse({'draft_posts': serialized_draft_posts})
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+# Search for active posts by title, username(author), or content
+@csrf_exempt
+def search_active_posts(request):
+    if request.method == 'GET':
+        # Get search query parameters from the request
+        search_query = request.GET.get('q', '')
+
+        # Search for active posts matching the search query
+        active_posts = BlogPost.objects.filter(
+            Q(content__icontains=search_query) | 
+            Q(title__icontains=search_query) | 
+            Q(user__username__icontains=search_query),
+            status='active'
+        ).distinct()
+
+        # Serialize active posts with required information
+        serialized_active_posts = []
+        for post in active_posts:
+            # Get tags associated with the post
+            tags = Tag.objects.filter(post_id=post)
+
+            # Serialize tags into JSON format
+            serialized_tags = []
+            for tag in tags:
+                tag_data = {
+                    'tag_id': tag.tag_id,
+                    'name': tag.name
+                }
+                serialized_tags.append(tag_data)
+
+            # Prepare the response data for the active post
+            post_data = {
+                'post_id': post.post_id,
+                'title': post.title,
+                'category': post.category.name,
+                'image': post.image.url if post.image else None,
+                'tags': serialized_tags
+            }
+
+            serialized_active_posts.append(post_data)
+
+        return JsonResponse({'active_posts': serialized_active_posts})
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+
+
+
+#Filter blog posts by category or tag.
+@csrf_exempt
+def get_posts_by_category(request, category_id):
+    if request.method == 'GET':
+        try:
+            # Find the category
+            category = Category.objects.get(category_id=category_id)
+
+            # Find all posts related to the category
+            posts = BlogPost.objects.filter(category=category, status='active')
+
+            # Serialize posts into JSON format
+            serialized_posts = []
+            for post in posts:
+                post_data = {
+                    'post_id': post.post_id,
+                    'title': post.title,
+                    'content': post.content,
+                    'image': post.image.url if post.image else None,
+                    'created_at': post.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                    'updated_at': post.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
+                    'user': post.user.username,
+                    'category': post.category.name,
+                    'status': post.status
+                }
+                serialized_posts.append(post_data)
+
+            return JsonResponse({'posts': serialized_posts})
+        except Category.DoesNotExist:
+            return JsonResponse({'error': 'Category not found'}, status=404)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
 
 
