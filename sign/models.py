@@ -17,8 +17,16 @@ class Category(models.Model):
     category_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=100)
 
+
     def __str__(self):
         return self.name
+
+
+
+
+
+
+
 
 class BlogPost(models.Model):
     post_id = models.AutoField(primary_key=True)
@@ -27,8 +35,34 @@ class BlogPost(models.Model):
     image = models.ImageField(upload_to='blog_images/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    category = models.ForeignKey(Category, on_delete=models.CASCADE)
+    user = models.ForeignKey('User', on_delete=models.CASCADE)
+    category = models.ForeignKey('Category', on_delete=models.CASCADE)
+    status = models.CharField(max_length=50, default='active')
 
     def __str__(self):
         return self.title
+
+
+
+class Comment(models.Model):
+    comment_id = models.AutoField(primary_key=True)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    user_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    post_id = models.ForeignKey(BlogPost, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"Comment by {self.user_id.username} on '{self.post_id.title}'"
+
+
+
+class Tag(models.Model):
+    tag_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=150)
+    user_id = models.ForeignKey('User', on_delete=models.CASCADE)
+    post_id = models.ForeignKey(BlogPost, on_delete=models.CASCADE)
+    status = models.CharField(max_length=50, default='active')
+
+    def __str__(self):
+        return self.name
