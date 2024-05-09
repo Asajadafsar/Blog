@@ -569,56 +569,42 @@ def delete_comment(request, comment_id):
 @token_required
 def add_deraf_post(request):
     if request.method == 'POST':
-        # Get user ID from the token
-        user_id = request.user.user_id
-        
-        # Parse JSON data from request body
         try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+            # Parse form data
+            title = request.POST.get('title')
+            content = request.POST.get('content')
+            category_name = request.POST.get('category_name')
+            tags = request.POST.getlist('tags')
+            image = request.FILES.get('image')
 
-        # Extract data from JSON
-        title = data.get('title')
-        content = data.get('content')
-        category_name = data.get('category_name')
-        tags = data.get('tags', [])  # Get tags as a list
-        
-        # Check if required fields are present
-        if not all([title, content, category_name]):
-            return JsonResponse({'error': 'Missing required fields'}, status=400)
+            # Check if required fields are provided
+            if not all([title, content, category_name]):
+                return JsonResponse({'error': 'One or more required fields are missing'}, status=400)
 
-        # Extract image file from request.FILES
-        image = request.FILES.get('image')
+            # Get user ID from the token
+            user_id = request.user.user_id
 
-        try:
-            # Fetch category object based on category name
-            category = Category.objects.get(name=category_name)
-        except Category.DoesNotExist:
-            return JsonResponse({'error': 'Category does not exist'}, status=400)
-
-        try:
             # Fetch user object based on user_id
             user = User.objects.get(user_id=user_id)
-        except User.DoesNotExist:
-            return JsonResponse({'error': 'User does not exist'}, status=400)
 
-        try:
-            # Create new blog post with status as 'draft'
+            # Fetch category object based on category name
+            category, created = Category.objects.get_or_create(name=category_name)
+
+            # Create new blog post
             new_post = BlogPost.objects.create(
                 title=title,
                 content=content,
                 image=image,
-                user=user,  # Use user instance instead of user_id
+                user=user,
                 category=category,
-                status='draft'  # Set status to 'draft'
+                status='draft' 
             )
 
-            # Add tags to the post with status as 'draft'
+            # Add tags to the post
             for tag_name in tags:
                 # Check if the tag already exists, if not, create it
-                tag, created = Tag.objects.get_or_create(name=tag_name, user_id=user, post_id=new_post, status='draft')
-            
+                tag, created = Tag.objects.get_or_create(name=tag_name, user_id=user, post_id=new_post,status='draft')
+
             return JsonResponse({'success': 'Draft post added successfully'}, status=201)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
@@ -632,17 +618,11 @@ def add_deraf_post(request):
 @csrf_exempt
 @token_required
 def edit_draft_post(request, post_id):
-    if request.method == 'PUT':
+    if request.method == 'POST':
         # Get user ID from the token
         user_id = request.user.user_id
         
-        # Parse JSON data from request body
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
-
-        # Fetch the post to edit
+        # Check if the post exists
         try:
             post = BlogPost.objects.get(post_id=post_id, user_id=user_id)
         except BlogPost.DoesNotExist:
@@ -650,39 +630,49 @@ def edit_draft_post(request, post_id):
 
         # Check if the post is active
         if post.status == 'active':
-            return JsonResponse({'error': 'Post is not Draft'}, status=403)
+            return JsonResponse({'error': 'Post is not draft'}, status=403)
 
         # Update fields if provided
-        if 'title' in data:
-            post.title = data['title']
-        if 'content' in data:
-            post.content = data['content']
-        if 'category_name' in data:
+        if 'title' in request.POST:
+            post.title = request.POST['title']
+        if 'content' in request.POST:
+            post.content = request.POST['content']
+        if 'category_name' in request.POST:
+            category_name = request.POST['category_name']
             try:
-                category = Category.objects.get(name=data['category_name'])
+                category = Category.objects.get(name=category_name)
                 post.category = category
             except Category.DoesNotExist:
                 return JsonResponse({'error': 'Category does not exist'}, status=400)
-        
-        # Add new tags
-        if 'add_tag' in data:
-            for tag_name in data['add_tag']:
-                # Get or create User instance for the tag
-                user_instance = User.objects.get(user_id=user_id)
-                tag, created = Tag.objects.get_or_create(name=tag_name, user_id=user_instance, post_id=post)
 
-        # Delete tags
-        if 'delete_tag' in data:
-            for tag_name in data['delete_tag']:
-                try:
-                    tag = Tag.objects.get(name=tag_name, user_id=user_id, post_id=post)
-                    tag.delete()
-                except Tag.DoesNotExist:
-                    pass  # Tag doesn't exist, no need to delete
+        # Update image if provided
+        if 'image' in request.FILES:
+            post.image.delete()  # Delete the previous image
+            post.image = request.FILES['image']
         
-        # Save the changes
+        # Save the changes to the post
         post.save()
 
+        # Fetch the User object based on user_id
+        user = User.objects.get(user_id=user_id)
+
+        # Add new tags
+        add_tags = request.POST.getlist('add_tag')
+        for tag_name in add_tags:
+            # Ensure tag name is not empty
+            if tag_name:
+                # Create the tag if it doesn't exist
+                tag, created = Tag.objects.get_or_create(name=tag_name, user_id=user, post_id=post,status='draft')
+                # Optionally, you can set status or other fields for the tag here if needed
+
+        # Delete tags
+        delete_tags = request.POST.getlist('delete_tag')
+        for tag_name in delete_tags:
+            # Ensure tag name is not empty
+            if tag_name:
+                # Delete the tag if it exists
+                Tag.objects.filter(name=tag_name, user_id=user, post_id=post_id).delete()
+        
         return JsonResponse({'success': 'Post Draft updated successfully'}, status=200)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
@@ -772,7 +762,8 @@ def display_draft_posts(request):
                 'post_id': post.post_id,
                 'title': post.title,
                 'content': post.content,
-                'tags': serialized_tags
+                'tags': serialized_tags,
+                'image': post.image.url if post.image else None
             }
 
             serialized_draft_posts.append(post_data)
