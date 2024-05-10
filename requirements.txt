@@ -1,0 +1,8 @@
+# Django packages
+asgiref==3.5.0
+Django==4.0.3
+django-crispy-forms==1.13.0
+django-widget-tweaks==1.4.11
+
+# React Admin packages
+react-admin==4.10.1
