@@ -4,7 +4,7 @@ from django.db.models import Q
 from functools import wraps
 import jwt
 from .models import AdminLogs
-from sign.models import User,BlogPost
+from sign.models import User,BlogPost,Comment,Tag,Category
 from datetime import datetime
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.hashers import make_password
@@ -48,78 +48,71 @@ def create_adminlogs(user, action, ip_address):
     return new_log
 
 
-#get list user
+
+
+#manage user
 @csrf_exempt
 @token_required
-def get_users(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
+def manage_users(request, user_id=None):
+    if request.method == 'GET':
+        # Ensure the logged-in user has admin role
+        if request.user.role != 'admin':
+            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
 
-    # Ensure the logged-in user has admin role
-    if request.user.role != 'admin':
-        return JsonResponse({'error': 'Insufficient privileges'}, status=403)
+        # Parse request parameters
+        sort_field, sort_order = request.GET.get('sort', 'user_id,ASC').split(',')
+        filter_query = request.GET.get('filter', '{}')
+        range_header = request.GET.get('range', '0,9')
 
-    # Parse request parameters
-    sort_field, sort_order = request.GET.get('sort', 'user_id,ASC').split(',')
-    filter_query = request.GET.get('filter', '{}')
-    range_header = request.GET.get('range', '0,9')
+        # Process sort parameters
+        if sort_field == 'id':
+            sort_field = 'user_id'
+        if sort_order not in ['ASC', 'DESC']:
+            sort_order = 'ASC'  # Default sorting order
 
-    # Process sort parameters
-    if sort_field == 'id':
-        sort_field = 'user_id'
-    if sort_order not in ['ASC', 'DESC']:
-        sort_order = 'ASC'  # Default sorting order
+        # Process range parameters
+        start, end = map(int, range_header.split(','))
 
-    # Process range parameters
-    start, end = map(int, range_header.split(','))
+        # Build Q objects for filtering
+        q_objects = Q(role='user')  # Only customers
+        if filter_query:
+            filter_dict = eval(filter_query)  # Convert filter string to dictionary
+            if 'email' in filter_dict:
+                q_objects &= Q(email__icontains=filter_dict['email'])
+            if 'username' in filter_dict:
+                q_objects &= Q(username__icontains=filter_dict['username'])
+            if 'phone_number' in filter_dict:
+                q_objects &= Q(phone_number__icontains=filter_dict['phone_number'])
 
-    # Build Q objects for filtering
-    q_objects = Q(role='user')  # Only customers
-    if filter_query:
-        filter_dict = eval(filter_query)  # Convert filter string to dictionary
-        if 'email' in filter_dict:
-            q_objects &= Q(email__icontains=filter_dict['email'])
-        if 'username' in filter_dict:
-            q_objects &= Q(username__icontains=filter_dict['username'])
-        if 'phone_number' in filter_dict:
-            q_objects &= Q(phone_number__icontains=filter_dict['phone_number'])
+        # Perform the filtered query
+        users_query = User.objects.filter(q_objects)
 
-    # Perform the filtered query
-    users_query = User.objects.filter(q_objects)
+        # Apply sorting order
+        sort_field = sort_field if sort_order == 'ASC' else f'-{sort_field}'  # Construct field name with sorting order
+        users_query = users_query.order_by(sort_field)
 
-    # Apply sorting order
-    sort_field = sort_field if sort_order == 'ASC' else f'-{sort_field}'  # Construct field name with sorting order
-    users_query = users_query.order_by(sort_field)
+        # Perform pagination
+        paginator = Paginator(users_query, end - start + 1)
+        users_page = paginator.get_page(start // (end - start + 1) + 1)
 
-    # Perform pagination
-    paginator = Paginator(users_query, end - start + 1)
-    users_page = paginator.get_page(start // (end - start + 1) + 1)
+        # Extract user data
+        users_data = [{
+            'id': user.user_id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role,
+            'phone_number': user.phone_number,
+            'registration_date': user.registration_date.strftime('%Y-%m-%d') if user.registration_date else None
+        } for user in users_page]
 
-    # Extract user data
-    users_data = [{
-        'id': user.user_id,
-        'username': user.username,
-        'email': user.email,
-        'role': user.role,
-        'phone_number': user.phone_number,
-        'registration_date': user.registration_date.strftime('%Y-%m-%d') if user.registration_date else None
-    } for user in users_page]
+        # Prepare response
+        response = JsonResponse(users_data, safe=False)
+        response['X-Total-Count'] = paginator.count
+        response['Content-Range'] = f'customers {start}-{end}/{paginator.count}'
 
-    # Prepare response
-    response = JsonResponse(users_data, safe=False)
-    response['X-Total-Count'] = paginator.count
-    response['Content-Range'] = f'customers {start}-{end}/{paginator.count}'
+        return response
 
-    return response
-
-
-
-
-#add user
-@csrf_exempt
-@token_required
-def add_user(request):
-    if request.method == 'POST':
+    elif request.method == 'POST':
         # Ensure the logged-in user has admin role
         if request.user.role != 'admin':
             return JsonResponse({'error': 'Insufficient privileges'}, status=403)
@@ -168,17 +161,43 @@ def add_user(request):
             
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
+
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
 
 
-# delete user
+#manage user
 @csrf_exempt
 @token_required
-def delete_user(request, user_id):
-    if request.method == 'DELETE':
+def manage_user(request, user_id):
+    if request.method == 'GET':
+        # Ensure the logged-in user has admin role
+        if request.user.role != 'admin':
+            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
+
+        # Retrieve the user by user_id
+        try:
+            user = User.objects.get(user_id=user_id)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        # Serialize user data
+        user_data = {
+            'id': user.user_id,
+            'username': user.username,
+            'email': user.email,
+            'phone_number': user.phone_number,
+            'role': user.role,
+            'registration_date': user.registration_date.strftime('%Y-%m-%d') if user.registration_date else None,
+            'profile_picture': request.build_absolute_uri(user.profile_picture.url) if user.profile_picture else None
+        }
+
+        return JsonResponse(user_data, status=200)
+    
+    elif request.method == 'DELETE':
+        # Ensure the logged-in user has admin role
         if request.user.role != 'admin':
             return JsonResponse({'error': 'Insufficient privileges'}, status=403)
         
@@ -200,17 +219,8 @@ def delete_user(request, user_id):
         # Create admin log
         create_adminlogs(user=request.user, action='delete user', ip_address=ip_address)
         return JsonResponse({'message': 'User deleted successfully', 'id': user_id}, status=200)
-    else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-
-
-
-#edit user
-@csrf_exempt
-@token_required
-def update_user(request, user_id):
-    if request.method == 'POST':
+    
+    elif request.method == 'POST':
         # Ensure the logged-in user has admin role
         if request.user.role != 'admin':
             return JsonResponse({'error': 'Insufficient privileges'}, status=403)
@@ -270,40 +280,10 @@ def update_user(request, user_id):
 
 
 
-#get user/id
-@csrf_exempt
-@token_required
-def get_user(request, user_id):
-    if request.method == 'GET':
-        # Ensure the logged-in user has admin role
-        if request.user.role != 'admin':
-            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
-
-        # Retrieve the user by user_id
-        try:
-            user = User.objects.get(user_id=user_id)
-        except User.DoesNotExist:
-            return JsonResponse({'error': 'User not found'}, status=404)
-
-        # Serialize user data
-        user_data = {
-            'id': user.user_id,
-            'username': user.username,
-            'email': user.email,
-            'phone_number': user.phone_number,
-            'role': user.role,
-            'registration_date': user.registration_date.strftime('%Y-%m-%d') if user.registration_date else None,
-            'profile_picture': request.build_absolute_uri(user.profile_picture.url) if user.profile_picture else None
-        }
-
-        return JsonResponse(user_data, status=200)
-    else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
 
-
-
+#manage logs
 #view logs
 @csrf_exempt
 @token_required
@@ -345,7 +325,6 @@ def view_admin_logs(request):
 
 
 
-
 #delete logs
 @csrf_exempt
 @token_required
@@ -371,6 +350,10 @@ def delete_admin_log(request, log_id):
 
 
 
+
+
+
+#manage post
 #get list all posts
 def get_blog_posts(request):
     if request.method != 'GET':
@@ -433,10 +416,11 @@ def get_blog_posts(request):
 
 
 
-#get post id
+
+#manage post
 @csrf_exempt
 @token_required
-def get_blog_post(request, post_id):
+def manage_blog_post(request, post_id):
     if request.method == 'GET':
         # Ensure the logged-in user has admin role
         if request.user.role != 'admin':
@@ -462,16 +446,8 @@ def get_blog_post(request, post_id):
         }
 
         return JsonResponse(post_data, status=200)
-    else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-
-
-#delete post
-@csrf_exempt
-@token_required
-def delete_blog_post(request, post_id):
-    if request.method == 'DELETE':
+    
+    elif request.method == 'DELETE':
         # Ensure the logged-in user has admin role
         if request.user.role != 'admin':
             return JsonResponse({'error': 'Insufficient privileges'}, status=403)
@@ -494,16 +470,8 @@ def delete_blog_post(request, post_id):
         # Create admin log
         create_adminlogs(user=request.user, action='delete blog post', ip_address=ip_address)
         return JsonResponse({'message': 'Blog post deleted successfully', 'id': post_id}, status=200)
-    else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-
-
-#edit post
-@csrf_exempt
-@token_required
-def update_blog_post(request, post_id):
-    if request.method == 'POST':
+    
+    elif request.method == 'POST':
         # Ensure the logged-in user has admin role
         if request.user.role != 'admin':
             return JsonResponse({'error': 'Insufficient privileges'}, status=403)
@@ -557,6 +525,123 @@ def update_blog_post(request, post_id):
             'category_id': post.category.category_id,
             'status': post.status
         }, status=200)
+    
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+
+#manage comment
+#get comments list
+@csrf_exempt
+@token_required
+def get_comments(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    # Ensure the logged-in user has admin role
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Insufficient privileges'}, status=403)
+
+    # Parse request parameters
+    sort_field, sort_order = request.GET.get('sort', 'comment_id,ASC').split(',')
+    filter_query = request.GET.get('filter', '{}')
+    range_header = request.GET.get('range', '0,9')
+
+    # Process sort parameters
+    if sort_field == 'id':
+        sort_field = 'comment_id'
+    if sort_order not in ['ASC', 'DESC']:
+        sort_order = 'ASC'  # Default sorting order
+
+    # Process range parameters
+    start, end = map(int, range_header.split(','))
+
+    # Build Q objects for filtering
+    q_objects = Q()  # Empty Q object to start with
+    if filter_query:
+        filter_dict = eval(filter_query)  # Convert filter string to dictionary
+        if 'user_id' in filter_dict:
+            q_objects &= Q(user_id=filter_dict['user_id'])
+        if 'post_id' in filter_dict:
+            q_objects &= Q(post_id=filter_dict['post_id'])
+
+    # Perform the filtered query
+    comments_query = Comment.objects.filter(q_objects)
+
+    # Apply sorting order
+    sort_field = sort_field if sort_order == 'ASC' else f'-{sort_field}'  # Construct field name with sorting order
+    comments_query = comments_query.order_by(sort_field)
+
+    # Perform pagination
+    paginator = Paginator(comments_query, end - start + 1)
+    comments_page = paginator.get_page(start // (end - start + 1) + 1)
+
+    # Extract comment data
+    comments_data = [{
+        'id': comment.comment_id,
+        'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        'updated_at': comment.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+        'user_id': comment.user_id.user_id,
+        'post_id': comment.post_id.post_id
+    } for comment in comments_page]
+
+    # Prepare response
+    response = JsonResponse(comments_data, safe=False)
+    response['X-Total-Count'] = paginator.count
+    response['Content-Range'] = f'comments {start}-{end}/{paginator.count}'
+
+    return response
+
+#manage comment
+@csrf_exempt
+@token_required
+def manage_comment(request, comment_id):
+    if request.method == 'GET':
+        # Ensure the logged-in user has admin role
+        if request.user.role != 'admin':
+            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
+
+        # Retrieve the comment by comment_id
+        try:
+            comment = Comment.objects.get(comment_id=comment_id)
+        except Comment.DoesNotExist:
+            return JsonResponse({'error': 'Comment not found'}, status=404)
+
+        # Serialize comment data
+        comment_data = {
+            'id': comment.comment_id,
+            'content': comment.content,
+            'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': comment.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'user_id': comment.user_id.user_id,
+            'post_id': comment.post_id.post_id
+        }
+
+        return JsonResponse(comment_data, status=200)
+    
+    elif request.method == 'DELETE':
+        # Ensure the logged-in user has admin role
+        if request.user.role != 'admin':
+            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
+        
+        # Check if the comment exists
+        comment = Comment.objects.filter(comment_id=comment_id).first()
+        if not comment:
+            return JsonResponse({'error': 'Comment not found'}, status=404)
+        
+        # Delete the comment from the database
+        comment.delete()
+        
+        # Get the IP address of the user who added the new user
+        ip_address = request.META.get('REMOTE_ADDR')
+        # Create admin log
+        create_adminlogs(user=request.user, action='delete comment', ip_address=ip_address)
+        # Optionally, perform additional cleanup actions here
+        
+        return JsonResponse({'message': 'Comment deleted successfully', 'id': comment_id}, status=200)
+    
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
