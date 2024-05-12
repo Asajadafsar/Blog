@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import manage_users, manage_user, delete_admin_log,view_admin_logs,get_blog_posts
-from .views import manage_blog_post,get_comments,manage_comment
+from .views import manage_blog_post,get_comments,manage_comment,get_tags,get_tag
 
 
 
@@ -19,6 +19,8 @@ urlpatterns = [
     path('comments/', get_comments, name='get_comments'),
     path('comments/<int:comment_id>/', manage_comment, name='manage_comment'),
     path('comments/<int:comment_id>/', manage_comment, name='manage_comment'),
+    path('tags/', get_tags, name='get_tags'),
+    path('tags/<int:tag_id>/', get_tag, name='get_tag'),
 
 
 ]
