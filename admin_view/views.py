@@ -14,6 +14,10 @@ from django.core.files.base import ContentFile
 import os
 from django.conf import settings
 from django.utils import timezone
+from django.core.exceptions import ObjectDoesNotExist
+
+
+
 
 
 # JWT secret key (should be securely stored)
@@ -417,6 +421,7 @@ def get_blog_posts(request):
 
 
 
+
 #manage post
 @csrf_exempt
 @token_required
@@ -432,6 +437,9 @@ def manage_blog_post(request, post_id):
         except BlogPost.DoesNotExist:
             return JsonResponse({'error': 'Blog post not found'}, status=404)
 
+        # Get all tags associated with the post
+        tags = Tag.objects.filter(post_id=post_id)
+
         # Serialize blog post data
         post_data = {
             'id': post.post_id,
@@ -442,7 +450,8 @@ def manage_blog_post(request, post_id):
             'updated_at': post.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
             'user_id': post.user.user_id,
             'category_id': post.category.category_id,
-            'status': post.status
+            'status': post.status,
+            'tags': [tag.name for tag in tags]  # Serialize tag names
         }
 
         return JsonResponse(post_data, status=200)
@@ -490,23 +499,26 @@ def manage_blog_post(request, post_id):
         post.content = data.get('content', post.content)
         post.status = data.get('status', post.status)
 
-        # Update the image if provided
-        if 'image' in request.FILES:
-            image_file = request.FILES['image']
+        # Update category if provided
+        category_id = data.get('category_id')
+        if category_id:
+            try:
+                category = Category.objects.get(category_id=category_id)
+                post.category = category
+            except Category.DoesNotExist:
+                return JsonResponse({'error': 'Category not found'}, status=404)
 
-            # Delete previous image if exists
-            if post.image:
-                file_path = os.path.join(settings.MEDIA_ROOT, post.image.name)
-                os.remove(file_path)
-
-            # Save the new image to the media directory
-            file_path = os.path.join(settings.MEDIA_ROOT, 'blog_images', image_file.name)
-            with open(file_path, 'wb+') as destination:
-                for chunk in image_file.chunks():
-                    destination.write(chunk)
-
-            # Update the blog post's image path
-            post.image = 'blog_images/' + image_file.name
+        # Don't delete existing tags, just add new ones
+        tags = request.POST.getlist('tags')  # Assuming tags are sent as a list of names or IDs
+        if tags:
+            for tag_name in tags:
+                try:
+                    # Check if tag with the given name exists
+                    tag = Tag.objects.get(name=tag_name, post_id=post)
+                except ObjectDoesNotExist:
+                    # Create a new tag if it doesn't exist
+                    tag = Tag.objects.create(name=tag_name, user_id=request.user, post_id=post)
+        tags = Tag.objects.filter(post_id=post_id)
 
         # Save the updated blog post
         post.save()
@@ -523,11 +535,13 @@ def manage_blog_post(request, post_id):
             'updated_at': post.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
             'user_id': post.user.user_id,
             'category_id': post.category.category_id,
+            'tags': [tag.name for tag in tags],
             'status': post.status
         }, status=200)
     
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
 
 
 
@@ -594,6 +608,9 @@ def get_comments(request):
 
     return response
 
+
+
+
 #manage comment
 @csrf_exempt
 @token_required
@@ -644,5 +661,8 @@ def manage_comment(request, comment_id):
     
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
 
 
