@@ -359,6 +359,8 @@ def delete_admin_log(request, log_id):
 
 #manage post
 #get list all posts
+@csrf_exempt
+@token_required
 def get_blog_posts(request):
     if request.method != 'GET':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
@@ -663,6 +665,175 @@ def manage_comment(request, comment_id):
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
+
+
+
+
+#manage tag
+# Get all tags
+@csrf_exempt
+@token_required
+def get_tags(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    # Parse request parameters
+    sort_field, sort_order = request.GET.get('sort', 'tag_id,ASC').split(',')
+    filter_query = request.GET.get('filter', '{}')
+    range_header = request.headers.get('Range', '0-9')
+
+    # Process sort parameters
+    if sort_field == 'id':
+        sort_field = 'tag_id'
+    if sort_order not in ['ASC', 'DESC']:
+        sort_order = 'ASC'  # Default sorting order
+
+    # Process range parameters
+    start, end = map(int, range_header.split('-'))
+
+    # Build Q objects for filtering
+    q_objects = Q()
+    if filter_query:
+        filter_dict = eval(filter_query)  # Convert filter string to dictionary
+        if 'name' in filter_dict:
+            q_objects &= Q(name__icontains=filter_dict['name'])
+        if 'user__username' in filter_dict:
+            q_objects &= Q(user_id__username__icontains=filter_dict['user__username'])
+        if 'post__title' in filter_dict:
+            q_objects &= Q(post_id__title__icontains=filter_dict['post__title'])
+
+    # Perform the filtered query
+    tags_query = Tag.objects.filter(q_objects)
+
+    # Apply sorting order
+    sort_field = sort_field if sort_order == 'ASC' else f'-{sort_field}'  # Construct field name with sorting order
+    tags_query = tags_query.order_by(sort_field)
+
+    # Perform pagination
+    paginator = Paginator(tags_query, end - start + 1)
+    tags_page = paginator.get_page(start // (end - start + 1) + 1)
+
+    # Serialize tag data
+    tags_data = [{
+        'id': tag.tag_id,
+        'name': tag.name,
+        'user_id': tag.user_id.user_id,
+        'post_id': tag.post_id.post_id,
+        'status': tag.status
+    } for tag in tags_page]
+
+    # Prepare response
+    response = JsonResponse(tags_data, status=200, safe=False)
+    response['X-Total-Count'] = paginator.count
+    response['Content-Range'] = f'tags {start}-{end}/{paginator.count}'
+
+    return response
+
+
+
+# Get tag by tag_id
+@csrf_exempt
+@token_required
+def get_tag(request, tag_id):
+    if request.method == 'GET':
+        # Ensure the logged-in user has admin role
+        if request.user.role != 'admin':
+            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
+
+        # Retrieve the tag by tag_id
+        try:
+            tag = Tag.objects.get(tag_id=tag_id)
+        except Tag.DoesNotExist:
+            return JsonResponse({'error': 'Tag not found'}, status=404)
+
+        # Serialize tag data
+        tag_data = {
+            'id': tag.tag_id,
+            'name': tag.name,
+            'user_id': tag.user_id.user_id,
+            'post_id': tag.post_id.post_id,
+            'status': tag.status
+        }
+
+        return JsonResponse(tag_data, status=200)
+    
+    elif request.method == 'DELETE':
+        # Ensure the logged-in user has admin role
+        if request.user.role != 'admin':
+            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
+        
+        # Check if the tag exists
+        tag = Tag.objects.filter(tag_id=tag_id).first()
+        if not tag:
+            return JsonResponse({'error': 'Tag not found'}, status=404)
+        
+        # Delete the tag from the database
+        tag.delete()
+        
+        # Get the IP address of the user who deleted the tag
+        ip_address = request.META.get('REMOTE_ADDR')
+        # Create admin log
+        create_adminlogs(user=request.user, action='delete tag', ip_address=ip_address)
+        
+        return JsonResponse({'message': 'Tag deleted successfully', 'id': tag_id}, status=200)
+    
+    elif request.method == 'POST':
+        # Ensure the logged-in user has admin role
+        if request.user.role != 'admin':
+            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
+
+        # Parse request data
+        data = request.POST
+
+        # Retrieve the existing tag by tag_id
+        try:
+            existing_tag = Tag.objects.get(tag_id=tag_id)
+        except Tag.DoesNotExist:
+            return JsonResponse({'error': 'Tag not found'}, status=404)
+
+        # Retrieve the blog post by post_id
+        post_id = data.get('post_id')
+        try:
+            post = BlogPost.objects.get(post_id=post_id)
+        except BlogPost.DoesNotExist:
+            return JsonResponse({'error': 'Post not found'}, status=404)
+
+        # Extract and validate tag name
+        tag_name = data.get('name')
+        if not tag_name:
+            return JsonResponse({'error': 'Tag name is required'}, status=400)
+
+        # Extract and validate user_id
+        user_id = data.get('user_id')
+        try:
+            user = User.objects.get(user_id=user_id)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        # Update the existing tag with new data
+        existing_tag.name = tag_name
+        existing_tag.user_id = user
+        existing_tag.post_id = post
+        existing_tag.save()
+
+        # Serialize updated tag data
+        tag_data = {
+            'id': existing_tag.tag_id,
+            'name': existing_tag.name,
+            'user_id': existing_tag.user_id.user_id,
+            'post_id': existing_tag.post_id.post_id,
+            'status': existing_tag.status
+        }
+
+        # Get the IP address of the user who updated the tag
+        ip_address = request.META.get('REMOTE_ADDR')
+        # Create admin log
+        create_adminlogs(user=request.user, action='update tag', ip_address=ip_address)
+
+        return JsonResponse(tag_data, status=200)
+    
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
 
