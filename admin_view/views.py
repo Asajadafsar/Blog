@@ -6,6 +6,7 @@ import jwt
 from .models import AdminLogs
 from sign.models import User,BlogPost,Comment,Tag,Category
 from datetime import datetime
+from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.hashers import make_password
 import hashlib
@@ -837,3 +838,127 @@ def get_tag(request, tag_id):
 
 
 
+# Get all categories
+@csrf_exempt
+@token_required
+def get_categories(request):
+    if request.method == 'GET':
+        # Parse request parameters
+        sort_field, sort_order = request.GET.get('sort', 'category_id,ASC').split(',')
+        filter_query = request.GET.get('filter', '{}')
+        range_header = request.headers.get('Range', '0-9')
+
+        # Process sort parameters
+        if sort_field == 'id':
+            sort_field = 'category_id'
+        if sort_order not in ['ASC', 'DESC']:
+            sort_order = 'ASC'  # Default sorting order
+
+        # Process range parameters
+        start, end = map(int, range_header.split('-'))
+
+        # Build Q objects for filtering
+        q_objects = Q()
+        if filter_query:
+            filter_dict = eval(filter_query)  # Convert filter string to dictionary
+            if 'name' in filter_dict:
+                q_objects &= Q(name__icontains=filter_dict['name'])
+
+        # Perform the filtered query
+        categories_query = Category.objects.filter(q_objects)
+
+        # Apply sorting order
+        sort_field = sort_field if sort_order == 'ASC' else f'-{sort_field}'  # Construct field name with sorting order
+        categories_query = categories_query.order_by(sort_field)
+
+        # Perform pagination
+        paginator = Paginator(categories_query, end - start + 1)
+        categories_page = paginator.get_page(start // (end - start + 1) + 1)
+
+        # Serialize category data
+        categories_data = [{
+            'id': category.category_id,
+            'name': category.name,
+        } for category in categories_page]
+
+        # Prepare response
+        response = JsonResponse(categories_data, status=200, safe=False)
+        response['X-Total-Count'] = paginator.count
+        response['Content-Range'] = f'categories {start}-{end}/{paginator.count}'
+
+        return response
+
+    elif request.method == 'POST':
+        # Extract data from the request
+        data = request.POST
+        name = data.get('name')
+
+        # Check if all required fields are provided
+        if not name:
+            return JsonResponse({'error': 'Name field is missing'}, status=400)
+
+        # Create the category
+        try:
+            new_category = Category.objects.create(
+                name=name
+            )
+            return JsonResponse({'id': new_category.category_id, 'name': name}, status=201)
+            
+        except ValidationError as e:
+            return JsonResponse({'error': e.messages}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+
+@csrf_exempt
+@token_required
+def manage_category(request, category_id=None):
+    if request.method == 'GET':
+        # Retrieve the category by category_id
+        try:
+            category = Category.objects.get(category_id=category_id)
+        except Category.DoesNotExist:
+            return JsonResponse({'error': 'Category not found'}, status=404)
+
+        # Serialize category data
+        category_data = {
+            'category_id': category.category_id,
+            'name': category.name
+        }
+
+        return JsonResponse(category_data, status=200)
+
+    elif request.method == 'DELETE':
+        # Check if the category exists
+        category = Category.objects.filter(category_id=category_id).first()
+        if not category:
+            return JsonResponse({'error': 'Category not found'}, status=404)
+        
+        # Delete the category from the database
+        category.delete()
+        return JsonResponse({'message': 'Category deleted successfully', 'category_id': category_id}, status=200)
+
+    elif request.method == 'POST':
+        # Retrieve the category to update
+        try:
+            category = Category.objects.get(category_id=category_id)
+        except Category.DoesNotExist:
+            return JsonResponse({'error': 'Category not found'}, status=404)
+
+        # Parse request data
+        data = request.POST
+
+        # Update category name if provided in the request
+        category.name = data.get('name', category.name)
+
+        # Save the updated category
+        category.save()
+        return JsonResponse({'category_id': category.category_id, 'name': category.name}, status=200)
+
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
