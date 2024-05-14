@@ -1,0 +1,100 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- MATERIAL DESIGN ICONIC FONT -->
+    <link rel="stylesheet"
+        href="{% static 'fonts/material-design-iconic-font/css/material-design-iconic-font.min.css' %}">
+
+    <!-- STYLE CSS -->
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+    <!-- JQUERY -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+</head>
+
+<body>
+
+    <div class="wrapper" style="background-image: url('{% static 'images/bg-registration-form-1.jpg' %}');">
+        <div class="inner">
+            <div class="image-holder">
+                <img src="{% static 'images/registration-form-1.jpg' %}" alt="">
+            </div>
+            <form id="login-form">
+                <h3>Login Form</h3>
+                <div class="form-group">
+                    <input type="text" id="username" placeholder="Username or Email" class="form-control"
+                        name="username" required>
+                </div>
+                <div class="form-wrapper">
+                    <input type="password" id="password" placeholder="Password" class="form-control" name="password"
+                        required>
+                    <i class="zmdi zmdi-lock"></i>
+                </div>
+                <button type="submit">Login
+                    <i class="zmdi zmdi-arrow-right"></i>
+                </button>
+            </form>
+
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function () {
+            // Check if user is already logged in (stored token in local storage)
+            const token = localStorage.getItem('token');
+            if (token) {
+                window.location.href = "/home/"; // Redirect to home page if logged in
+            }
+
+            $('#login-form').submit(function (event) {
+                event.preventDefault(); // Prevent the form from submitting normally
+
+                // Get the values of username and password fields
+                var username = $('#username').val().trim();
+                var password = $('#password').val().trim();
+
+                // Validate if the fields are not empty
+                if (username === '' || password === '') {
+                    alert('Username and password are required!');
+                    return;
+                }
+
+                // Construct JSON object with form data
+                var formData = {
+                    username: username,
+                    password: password
+                };
+
+                // Convert JSON object to string
+                var jsonData = JSON.stringify(formData);
+
+                // Submit the JSON data using AJAX
+                $.ajax({
+                    type: 'POST',
+                    url: '/sign/login/',
+                    data: jsonData,
+                    contentType: 'application/json', // Specify content type as JSON
+                    success: function (response) {
+                        localStorage.setItem('token', response.token); // Store token in local storage
+                        window.location.href = "/home/"; // Redirect to home page upon successful login
+                    },
+                    error: function (xhr, status, error) {
+                        alert(xhr.responseText); // Display an alert with the error message
+                    }
+                });
+            });
+        });
+
+
+    </script>
+
+</body>
+
+</html>

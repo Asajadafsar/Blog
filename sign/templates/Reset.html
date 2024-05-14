@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Password</title>
+</head>
+
+<body>
+    <h2>Reset Password</h2>
+    <form id="reset-password-form">
+        <label for="new-password">New Password:</label><br>
+        <input type="password" id="new-password" name="new-password"><br><br>
+        <input type="submit" value="Reset Password">
+    </form>
+
+    <div id="message"></div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('#reset-password-form').submit(function (event) {
+                event.preventDefault(); // Prevent the form from submitting normally
+
+                // Get the value of new password field
+                var newPassword = $('#new-password').val().trim();
+
+                // Validate if the field is not empty
+                if (newPassword === '') {
+                    alert('New password is required!');
+                    return;
+                }
+
+                // Retrieve token from local storage
+                var token = localStorage.getItem('token');
+
+                // Check if token exists
+                if (!token) {
+                    alert('Token is missing!'); // Alert user if token is missing
+                    return;
+                }
+
+                // Log token to console for debugging
+                console.log("Token:", token);
+
+                // Construct JSON object with form data
+                var formData = {
+                    new_password: newPassword
+                };
+
+                // Convert JSON object to string
+                var jsonData = JSON.stringify(formData);
+
+                // Submit the JSON data using AJAX
+                $.ajax({
+                    type: 'POST',
+                    url: '/sign/rest/', // Update with your backend URL
+                    data: jsonData,
+                    contentType: 'application/json', // Specify content type as JSON
+                    headers: {
+                        'Authorization': 'Token ' + token  // Include Authorization header with token
+                    },
+                    success: function (response) {
+                        $('#message').text(response); // Display success message
+                    },
+                    error: function (xhr, status, error) {
+                        $('#message').text(xhr.responseText); // Display error message
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>

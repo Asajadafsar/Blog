@@ -1,47 +1,85 @@
+{% load static %}
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
     <title>Register</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
+
     <!-- MATERIAL DESIGN ICONIC FONT -->
-    <link rel="stylesheet" href="./static/fonts/material-design-iconic-font/css/material-design-iconic-font.min.css">
+    <link rel="stylesheet"
+        href="{% static 'fonts/material-design-iconic-font/css/material-design-iconic-font.min.css' %}">
 
     <!-- STYLE CSS -->
-    <link rel="stylesheet" href="./static/css/style.css">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+    <!-- JQUERY -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+
 </head>
 
 <body>
 
-    <div class="wrapper" style="background-image: url('./static/images/bg-registration-form-1.jpg');">
+    <div class="wrapper" style="background-image: url('{% static 'images/bg-registration-form-1.jpg' %}');">
         <div class="inner">
             <div class="image-holder">
-                <img src="./static/images/registration-form-1.jpg" alt="">
+                <img src="{% static 'images/registration-form-1.jpg' %}" alt="">
             </div>
-            <form action="">
+            <form method="post" action="{% url 'register_user' %}" enctype="multipart/form-data">
+                {% csrf_token %}
                 <h3>Registration Form</h3>
                 <div class="form-group">
-                    <input type="text" placeholder="Username" class="form-control" required>
+                    <input type="text" placeholder="Username" class="form-control" name="username" required>
                 </div>
                 <div class="form-wrapper">
-                    <input type="password" placeholder="Password" class="form-control" required>
+                    <input type="password" placeholder="Password" class="form-control" name="password" required>
                     <i class="zmdi zmdi-lock"></i>
                 </div>
                 <div class="form-wrapper">
-                    <input type="email" placeholder="Email Address" class="form-control" required>
+                    <input type="email" placeholder="Email Address" class="form-control" name="email" required>
                     <i class="zmdi zmdi-email"></i>
                 </div>
                 <div class="form-wrapper">
-                    <input type="tel" placeholder="Phone Number" class="form-control" required>
+                    <input type="tel" placeholder="Phone Number" class="form-control" name="phone_number" required>
                     <i class="zmdi zmdi-phone"></i>
                 </div>
-                <button>Register
+                <div class="form-wrapper">
+                    <input type="file" class="form-control" name="profile_picture">
+                </div>
+                <button type="submit">Register
                     <i class="zmdi zmdi-arrow-right"></i>
                 </button>
             </form>
         </div>
     </div>
-    
-</body><!-- This templates was made by Colorlib (https://colorlib.com) -->
+
+</body>
+
 </html>
+<script>
+    $(document).ready(function () {
+        $('form').submit(function (event) {
+            event.preventDefault(); // Prevent the form from submitting normally
+
+            // Submit the form data using AJAX
+            $.ajax({
+                type: $(this).attr('method'),
+                url: $(this).attr('action'),
+                data: new FormData(this),
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    // Redirect to the login page upon successful registration
+                    window.location.href = "/sign/login/";
+                },
+                error: function (xhr, status, error) {
+                    // Display an alert with the error message
+                    alert(xhr.responseJSON.error);
+                }
+            });
+        });
+    });
+</script>

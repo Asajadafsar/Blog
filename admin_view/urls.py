@@ -5,9 +5,9 @@ from .views import manage_blog_post,get_comments,manage_comment,get_tags,get_tag
 
 
 urlpatterns = [
-    path('users/', manage_users, name='manage_users'),
+    path('users', manage_users, name='manage_users'),
     path('users/<int:user_id>/', manage_user, name='manage_user'),
-    path('users/', manage_users, name='manage_users'),
+    path('users', manage_users, name='manage_users'),
     path('users/<int:user_id>/', manage_user, name='manage_user'),
     path('users/<int:user_id>/', manage_user, name='manage_user'),
     path('logs/<int:log_id>/', delete_admin_log, name='delete_admin_log'),
