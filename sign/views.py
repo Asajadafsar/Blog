@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from functools import wraps
 from django.core import serializers
 from django.db.models import Q
+from django.template.loader import render_to_string
 
 
 
@@ -74,11 +75,14 @@ def register_user(request):
 
             # Generate JWT token
             token = jwt.encode({'user_id': user.user_id}, SECRET_KEY, algorithm='HS256')
+
             return JsonResponse({'token': token})
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
     else:
-        return HttpResponse('Method not allowed!', status=405)
+        # Render the registration form HTML
+        return render(request, 'register.html')
+
 
 
 
@@ -123,7 +127,9 @@ def login_user(request):
         else:
             return HttpResponse('Required fields are missing!', status=400)
     else:
-        return HttpResponse('Method not allowed!', status=405)
+        # Render the login form HTML
+        return render(request, 'login.html')
+    
 
 
 #view_profile
@@ -141,7 +147,8 @@ def profile(request):
             'role': user.role
         })
     else:
-        return HttpResponse('Method not allowed!', status=405)
+            return render(request, 'profile.html')
+
 
 
 
@@ -194,8 +201,7 @@ def edit_profile(request):
         return HttpResponse('Method not allowed!', status=405)
 
 
-
-# Reset password
+#rest password
 @csrf_exempt
 @token_required
 def reset_password(request):
@@ -216,7 +222,10 @@ def reset_password(request):
             user.password = hashed_new_password
             user.save()
 
-            return HttpResponse('Password reset successfully!')
+            # Render HTML template
+            rendered_html = render_to_string('rest.html')
+
+            return HttpResponse(rendered_html)
         else:
             return HttpResponse('Required fields are missing!', status=400)
     else:
