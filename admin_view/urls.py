@@ -5,11 +5,10 @@ from .views import manage_blog_post,get_comments,manage_comment,get_tags,get_tag
 
 
 urlpatterns = [
-    path('users', manage_users, name='manage_users'),
-    path('users/<int:user_id>/', manage_user, name='manage_user'),
-    path('users', manage_users, name='manage_users'),
-    path('users/<int:user_id>/', manage_user, name='manage_user'),
-    path('users/<int:user_id>/', manage_user, name='manage_user'),
+    path('users', manage_users, name='get user_id'),
+    path('users/', manage_users, name='view all'),
+    path('users/<int:user_id>/', manage_user, name='delete and views'),
+    path('users/<int:user_id>', manage_user, name='Update'),
     path('logs/<int:log_id>/', delete_admin_log, name='delete_admin_log'),
     path('logs/', view_admin_logs, name='view_admin_logs'),
     path('posts/', get_blog_posts, name='get_blog_posts'),
