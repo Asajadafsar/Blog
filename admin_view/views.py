@@ -23,6 +23,7 @@ from .serializers import UserSerializer
 from django.utils import timezone
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from .serializers import AdminLogsSerializer
 
 
 
@@ -111,69 +112,23 @@ def manage_user(request, user_id):
 
 
 
-#manage logs
-#view logs
-@csrf_exempt
-@token_required
-def view_admin_logs(request):
-    if request.user.role != 'admin':
-        return JsonResponse({'error': 'Unauthorized access! Only admins can view logs'}, status=401)
-
-    # Parse request parameters
-    sort_field = request.GET.get('sort', 'log_id')
-    sort_order = request.GET.get('order', 'ASC')
-    filter_action = request.GET.get('action', None)
-    filter_user_id = request.GET.get('user_id', None)
-
-    # Query admin logs
-    admin_logs = AdminLogs.objects.all()
-
-    # Apply filters
-    if filter_action:
-        admin_logs = admin_logs.filter(action__icontains=filter_action)
-    if filter_user_id:
-        admin_logs = admin_logs.filter(user_id=filter_user_id)
-
-    # Apply sorting
-    if sort_order == 'DESC':
-        sort_field = '-' + sort_field
-
-    admin_logs = admin_logs.order_by(sort_field)
-
-    # Serialize admin logs
-    logs_data = [{
-        'id': log.log_id,
-        'user_id': log.user.user_id,
-        'action': log.action,
-        'action_date': log.action_date.strftime('%Y-%m-%d %H:%M:%S'),
-        'ip_address': log.ip_address,
-    } for log in admin_logs]
-
-    return JsonResponse(logs_data, safe=False)
-
-
-
-#delete logs
-@csrf_exempt
-@token_required
-def delete_admin_log(request, log_id):
-    if request.user.role != 'admin':
-        return JsonResponse({'error': 'Unauthorized access! Only admins can delete logs'}, status=401)
-
-    # Find the log to delete
-    try:
-        log = AdminLogs.objects.get(log_id=log_id)
-    except AdminLogs.DoesNotExist:
-        return JsonResponse({'error': 'Log not found'}, status=404)
-
-    # Delete the log
-    log.delete()
-
-    # Create admin log for the deletion
-    create_adminlogs(request.user, 'Deleted log', request.META.get('REMOTE_ADDR'))
-
-    return JsonResponse({'message': 'Log deleted successfully'}, status=200)
-
+#view all logs and delete
+@api_view(['GET', 'DELETE'])
+def manage_logs(request, log_id=None):
+    if request.method == 'GET':
+        logs = AdminLogs.objects.all()
+        serializer = AdminLogsSerializer(logs, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'DELETE':
+        try:
+            log = AdminLogs.objects.get(pk=log_id)
+        except AdminLogs.DoesNotExist:
+            return Response({'error': 'Log not found'}, status=status.HTTP_404_NOT_FOUND)
+        ip_address = request.META.get('REMOTE_ADDR')
+        add_log('delete log', ip_address)  # Log the action before deletion
+        log.delete()
+        return Response({'message': 'Log deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
 
 
 
