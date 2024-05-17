@@ -15,5 +15,5 @@ export const UserCreate = () => (
         </SimpleForm>
     </Create>
 );
-
+ 
 export default UserCreate;
