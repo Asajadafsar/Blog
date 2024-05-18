@@ -73,12 +73,20 @@ const dataProvider: DataProvider = {
       total: parseInt(response.headers['x-total-count']),
     }));
   },
-  update: (resource, params) =>
-    httpClient.put(`/${resource}/${params.id}`, params.data).then(response => ({
-      data: response.data,
-    })),
-  create: (resource, params) => {
-    if (resource === 'products' && params.data.image) {
+  update: (resource, params) => {
+    if (resource === 'users' && params.data.profile_picture) {
+      const formData = new FormData();
+      Object.keys(params.data).forEach(key => {
+        if (key === 'profile_picture' && params.data[key].rawFile) {
+          formData.append(key, params.data[key].rawFile);
+        } else {
+          formData.append(key, params.data[key]);
+        }
+      });
+      return httpClient.put(`/${resource}/${params.id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then(response => ({ data: response.data }));
+    } else if (resource === 'blog_posts' && params.data.image) { // اضافه کردن برای ادیت عکس پست
       const formData = new FormData();
       Object.keys(params.data).forEach(key => {
         if (key === 'image' && params.data[key].rawFile) {
@@ -87,15 +95,32 @@ const dataProvider: DataProvider = {
           formData.append(key, params.data[key]);
         }
       });
-      return httpClient.post(`/${resource}`, formData, {
+      return httpClient.put(`/${resource}/${params.id}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-      }).then(response => ({ data: { ...params.data, id: response.data.id } }));
+      }).then(response => ({ data: response.data }));
     } else {
-      return httpClient.post(`/${resource}`, params.data).then(response => ({
-        data: { ...params.data, id: response.data.id },
-      }));
+      return httpClient.put(`/${resource}/${params.id}`, params.data).then(response => ({ data: response.data }));
     }
   },
+  
+
+create: (resource, params) => {
+  if (resource === 'users' && params.data.profile_picture) {
+      const formData = new FormData();
+      Object.keys(params.data).forEach(key => {
+          if (key === 'profile_picture' && params.data[key].rawFile) {
+              formData.append(key, params.data[key].rawFile);
+          } else {
+              formData.append(key, params.data[key]);
+          }
+      });
+      return httpClient.post(`/${resource}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+      }).then(response => ({ data: response.data }));
+  } else {
+      return httpClient.post(`/${resource}`, params.data).then(response => ({ data: response.data }));
+  }
+},
   delete: (resource, params) =>
     httpClient.delete(`/${resource}/${params.id}`).then(response => ({
       data: response.data,

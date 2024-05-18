@@ -4,31 +4,26 @@ import {
     Datagrid,
     TextField,
     TextInput,
-    SearchInput,
     TopToolbar,
-    CreateButton,
     Pagination,
-    FilterButton,
     Create, 
     SimpleForm, 
-    FilterForm,
     required,
     ListProps,
     useListContext,
-    ImageField
+    ImageField,
+    Edit,
+    SelectInput,
+    ImageInput,
+    Show,
+    ShowProps,
+    SimpleShowLayout,
 } from 'react-admin';
 import { Stack } from '@mui/material';
 
-const UserFilters = [
-    <SearchInput source="username" alwaysOn />,
-    <TextInput label="username" source="username" resettable />
-];
-
 const ListToolbar = () => (
     <Stack direction="row" justifyContent="space-between">
-        <FilterForm filters={UserFilters} />
         <div>
-            <FilterButton filters={UserFilters} />
         </div>
     </Stack>
 );
@@ -50,5 +45,38 @@ export const UsersList = (props: ListProps<any>) => {
         </List>
     );
 };
+
+export const UserEdit = (props) => (
+    <Edit {...props}>
+        <SimpleForm>
+            <TextInput source="id" disabled label="ID" />
+            <TextInput source="username" validate={required()} label="Username" />
+            <TextInput source="email" validate={required()} label="Email" />
+            <TextInput source="phone_number" label="Phone Number" />
+            <SelectInput source="role" label="Role" choices={[
+                { id: 'admin', name: 'admin' },
+                { id: 'user', name: 'user' },
+            ]} />
+            <TextInput source="registration_date" disabled label="Registration Date" />
+            <ImageInput source="profile_picture" label="Profile Picture" accept="image/*">
+                <ImageField source="src" title="title" />
+            </ImageInput>
+        </SimpleForm>
+    </Edit>
+);
+
+export const UserShow = (props: ShowProps) => (
+    <Show {...props}>
+        <SimpleShowLayout>
+            <TextField source="id" label="ID" />
+            <TextField source="username" label="Username" />
+            <TextField source="email" label="Email" />
+            <TextField source="phone_number" label="Phone Number" />
+            <TextField source="role" label="Role" />
+            <TextField source="registration_date" label="Registration Date" />
+            <ImageField source="profile_picture" label="Profile Picture" />
+        </SimpleShowLayout>
+    </Show>
+);
 
 export default UsersList;

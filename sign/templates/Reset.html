@@ -17,58 +17,57 @@
 
     <div id="message"></div>
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
-        $(document).ready(function () {
-            $('#reset-password-form').submit(function (event) {
-                event.preventDefault(); // Prevent the form from submitting normally
+        document.getElementById('reset-password-form').addEventListener('submit', function (event) {
+            event.preventDefault(); // Prevent the form from submitting normally
 
-                // Get the value of new password field
-                var newPassword = $('#new-password').val().trim();
+            // Get the value of new password field
+            var newPassword = document.getElementById('new-password').value.trim();
 
-                // Validate if the field is not empty
-                if (newPassword === '') {
-                    alert('New password is required!');
-                    return;
+            // Validate if the field is not empty
+            if (newPassword === '') {
+                alert('New password is required!');
+                return;
+            }
+
+            // Retrieve token from session storage
+            // Retrieve token from local storage
+            const token = localStorage.getItem('token');
+            // Check if token exists
+            if (!token) {
+                alert('Token is missing!'); // Alert user if token is missing
+                return;
+            }
+
+            // Log token to console for debugging
+            console.log("Token:", token);
+
+            // Construct JSON object with form data
+            var formData = {
+                new_password: newPassword
+            };
+
+            // Submit the JSON data using Axios
+            axios.post('/sign/rest/', formData, {
+                headers: {
+                    'Content-Type': 'application/json', // Specify content type as JSON
+                    'Authorization': 'Token ' + token // Include Authorization header with token
                 }
-
-                // Retrieve token from local storage
-                var token = localStorage.getItem('token');
-
-                // Check if token exists
-                if (!token) {
-                    alert('Token is missing!'); // Alert user if token is missing
-                    return;
-                }
-
-                // Log token to console for debugging
-                console.log("Token:", token);
-
-                // Construct JSON object with form data
-                var formData = {
-                    new_password: newPassword
-                };
-
-                // Convert JSON object to string
-                var jsonData = JSON.stringify(formData);
-
-                // Submit the JSON data using AJAX
-                $.ajax({
-                    type: 'POST',
-                    url: '/sign/rest/', // Update with your backend URL
-                    data: jsonData,
-                    contentType: 'application/json', // Specify content type as JSON
-                    headers: {
-                        'Authorization': 'Token ' + token  // Include Authorization header with token
-                    },
-                    success: function (response) {
-                        $('#message').text(response); // Display success message
-                    },
-                    error: function (xhr, status, error) {
-                        $('#message').text(xhr.responseText); // Display error message
+            })
+                .then(function (response) {
+                    // Display success message
+                    document.getElementById('message').innerText = response.data;
+                })
+                .catch(function (error) {
+                    // Display error message
+                    if (error.response) {
+                        document.getElementById('message').innerText = error.response.data;
+                    } else {
+                        document.getElementById('message').innerText = 'An error occurred while processing your request.';
                     }
                 });
-            });
+
         });
     </script>
 </body>

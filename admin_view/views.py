@@ -23,7 +23,7 @@ from .serializers import UserSerializer
 from django.utils import timezone
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-from .serializers import AdminLogsSerializer
+from .serializers import AdminLogsSerializer,BlogPostSerializer,CategorySerializer,BlogPostSerializer,CommentSerializer,TagSerializer
 
 
 
@@ -79,7 +79,7 @@ def manage_users(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
+ 
 
 
 #edit and delete ann get user_id
@@ -132,611 +132,180 @@ def manage_logs(request, log_id=None):
 
 
 
+@api_view(['GET'])
+def manage_blog_posts(request):
+    if request.method == 'GET':
+        # Retrieve all blog posts
+        blog_posts = BlogPost.objects.all()
+        serializer = BlogPostSerializer(blog_posts, many=True)
+        return Response(serializer.data)
 
 
 
-
-#manage post
-#get list all posts
-@csrf_exempt
-@token_required
-def get_blog_posts(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-    # Parse request parameters
-    sort_field, sort_order = request.GET.get('sort', 'post_id,ASC').split(',')
-    filter_query = request.GET.get('filter', '{}')
-    range_header = request.headers.get('Range', '0-9')
-
-    # Process sort parameters
-    if sort_field == 'id':
-        sort_field = 'post_id'
-    if sort_order not in ['ASC', 'DESC']:
-        sort_order = 'ASC'  # Default sorting order
-
-    # Process range parameters
-    start, end = map(int, range_header.split('-'))
-
-    # Build Q objects for filtering
-    q_objects = Q()
-    if filter_query:
-        filter_dict = eval(filter_query)  # Convert filter string to dictionary
-        if 'title' in filter_dict:
-            q_objects &= Q(title__icontains=filter_dict['title'])
-        if 'user__username' in filter_dict:
-            q_objects &= Q(user__username__icontains=filter_dict['user__username'])
-        if 'category__name' in filter_dict:
-            q_objects &= Q(category__name__icontains=filter_dict['category__name'])
-
-    # Perform the filtered query
-    blog_posts_query = BlogPost.objects.filter(q_objects)
-
-    # Apply sorting order
-    sort_field = sort_field if sort_order == 'ASC' else f'-{sort_field}'  # Construct field name with sorting order
-    blog_posts_query = blog_posts_query.order_by(sort_field)
-
-    # Perform pagination
-    paginator = Paginator(blog_posts_query, end - start + 1)
-    blog_posts_page = paginator.get_page(start // (end - start + 1) + 1)
-
-    # Serialize blog post data
-    blog_posts_data = [{
-        'id': post.post_id,
-        'title': post.title,
-        'image': request.build_absolute_uri(post.image.url) if post.image else None,
-        'created_at': post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-        'updated_at': post.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
-        'user_id': post.user.user_id,
-        'category_id': post.category.category_id,
-        'status': post.status
-    } for post in blog_posts_page]
-
-    # Prepare response
-    response = JsonResponse(blog_posts_data, status=200, safe=False)
-    response['X-Total-Count'] = paginator.count
-    response['Content-Range'] = f'blog_posts {start}-{end}/{paginator.count}'
-
-    return response
-
-
-
-
-
-#manage post
-@csrf_exempt
-@token_required
+@api_view(['GET', 'PUT', 'DELETE'])
 def manage_blog_post(request, post_id):
+    try:
+        blog_post = BlogPost.objects.get(post_id=post_id)
+    except BlogPost.DoesNotExist:
+        return Response({'error': 'Blog post not found'}, status=status.HTTP_404_NOT_FOUND)
+
     if request.method == 'GET':
-        # Ensure the logged-in user has admin role
-        if request.user.role != 'admin':
-            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
+        # Retrieve a specific blog post by post_id
+        serializer = BlogPostSerializer(blog_post)
+        return Response(serializer.data)
 
-        try:
-            # Retrieve the blog post by post_id
-            post = BlogPost.objects.get(post_id=post_id)
-        except BlogPost.DoesNotExist:
-            return JsonResponse({'error': 'Blog post not found'}, status=404)
+    elif request.method == 'PUT':
+        # Update an existing blog post
+        serializer = BlogPostSerializer(blog_post, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            ip_address = request.META.get('REMOTE_ADDR')
+            add_log('edit blog post', ip_address)  # Log the action
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get all tags associated with the post
-        tags = Tag.objects.filter(post_id=post_id)
-
-        # Serialize blog post data
-        post_data = {
-            'id': post.post_id,
-            'title': post.title,
-            'content': post.content,
-            'image': request.build_absolute_uri(post.image.url) if post.image else None,
-            'created_at': post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'updated_at': post.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'user_id': post.user.user_id,
-            'category_id': post.category.category_id,
-            'status': post.status,
-            'tags': [tag.name for tag in tags]  # Serialize tag names
-        }
-
-        return JsonResponse(post_data, status=200)
-    
     elif request.method == 'DELETE':
-        # Ensure the logged-in user has admin role
-        if request.user.role != 'admin':
-            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
-        
-        # Check if the blog post exists
-        post = BlogPost.objects.filter(post_id=post_id).first()
-        if not post:
-            return JsonResponse({'error': 'Blog post not found'}, status=404)
-        
-        # Delete the blog post's image file if it exists
-        if post.image:
-            image_path = os.path.join(settings.MEDIA_ROOT, str(post.image))
-            if os.path.exists(image_path):
-                os.remove(image_path)
-
-        # Delete the blog post from the database
-        post.delete()
-        # Get the IP address of the user who deleted the blog post
+        # Delete an existing blog post
+        blog_post.delete()
         ip_address = request.META.get('REMOTE_ADDR')
-        # Create admin log
-        create_adminlogs(user=request.user, action='delete blog post', ip_address=ip_address)
-        return JsonResponse({'message': 'Blog post deleted successfully', 'id': post_id}, status=200)
-    
-    elif request.method == 'POST':
-        # Ensure the logged-in user has admin role
-        if request.user.role != 'admin':
-            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
+        add_log('delete blog post', ip_address)  # Log the action
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
-        # Retrieve the blog post to update
-        try:
-            post = BlogPost.objects.get(pk=post_id)
-        except BlogPost.DoesNotExist:
-            return JsonResponse({'error': 'Blog post not found'}, status=404)
 
-        # Parse request data
-        data = request.POST
 
-        # Update blog post fields if provided in the request
-        post.title = data.get('title', post.title)
-        post.content = data.get('content', post.content)
-        post.status = data.get('status', post.status)
 
-        # Update category if provided
-        category_id = data.get('category_id')
-        if category_id:
+
+#manage comment
+@api_view(['GET', 'DELETE'])
+def manage_comment(request, comment_id=None):
+    if request.method == 'GET':
+        if comment_id is not None:
+            # Retrieve a specific comment by comment_id
             try:
-                category = Category.objects.get(category_id=category_id)
-                post.category = category
-            except Category.DoesNotExist:
-                return JsonResponse({'error': 'Category not found'}, status=404)
-
-        # Don't delete existing tags, just add new ones
-        tags = request.POST.getlist('tags')  # Assuming tags are sent as a list of names or IDs
-        if tags:
-            for tag_name in tags:
-                try:
-                    # Check if tag with the given name exists
-                    tag = Tag.objects.get(name=tag_name, post_id=post)
-                except ObjectDoesNotExist:
-                    # Create a new tag if it doesn't exist
-                    tag = Tag.objects.create(name=tag_name, user_id=request.user, post_id=post)
-        tags = Tag.objects.filter(post_id=post_id)
-
-        # Save the updated blog post
-        post.save()
-        # Get the IP address of the user who added the new user
-        ip_address = request.META.get('REMOTE_ADDR')
-        # Create admin log
-        create_adminlogs(user=request.user, action='edit post', ip_address=ip_address)
-        return JsonResponse({
-            'id': post.post_id,
-            'title': post.title,
-            'content': post.content,
-            'image': request.build_absolute_uri(post.image.url) if post.image else None,
-            'created_at': post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'updated_at': post.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'user_id': post.user.user_id,
-            'category_id': post.category.category_id,
-            'tags': [tag.name for tag in tags],
-            'status': post.status
-        }, status=200)
-    
-    else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-
-
-
-
-#manage comment
-#get comments list
-@csrf_exempt
-@token_required
-def get_comments(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-    # Ensure the logged-in user has admin role
-    if request.user.role != 'admin':
-        return JsonResponse({'error': 'Insufficient privileges'}, status=403)
-
-    # Parse request parameters
-    sort_field, sort_order = request.GET.get('sort', 'comment_id,ASC').split(',')
-    filter_query = request.GET.get('filter', '{}')
-    range_header = request.GET.get('range', '0,9')
-
-    # Process sort parameters
-    if sort_field == 'id':
-        sort_field = 'comment_id'
-    if sort_order not in ['ASC', 'DESC']:
-        sort_order = 'ASC'  # Default sorting order
-
-    # Process range parameters
-    start, end = map(int, range_header.split(','))
-
-    # Build Q objects for filtering
-    q_objects = Q()  # Empty Q object to start with
-    if filter_query:
-        filter_dict = eval(filter_query)  # Convert filter string to dictionary
-        if 'user_id' in filter_dict:
-            q_objects &= Q(user_id=filter_dict['user_id'])
-        if 'post_id' in filter_dict:
-            q_objects &= Q(post_id=filter_dict['post_id'])
-
-    # Perform the filtered query
-    comments_query = Comment.objects.filter(q_objects)
-
-    # Apply sorting order
-    sort_field = sort_field if sort_order == 'ASC' else f'-{sort_field}'  # Construct field name with sorting order
-    comments_query = comments_query.order_by(sort_field)
-
-    # Perform pagination
-    paginator = Paginator(comments_query, end - start + 1)
-    comments_page = paginator.get_page(start // (end - start + 1) + 1)
-
-    # Extract comment data
-    comments_data = [{
-        'id': comment.comment_id,
-        'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-        'updated_at': comment.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
-        'user_id': comment.user_id.user_id,
-        'post_id': comment.post_id.post_id
-    } for comment in comments_page]
-
-    # Prepare response
-    response = JsonResponse(comments_data, safe=False)
-    response['X-Total-Count'] = paginator.count
-    response['Content-Range'] = f'comments {start}-{end}/{paginator.count}'
-
-    return response
-
-
-
-
-#manage comment
-@csrf_exempt
-@token_required
-def manage_comment(request, comment_id):
-    if request.method == 'GET':
-        # Ensure the logged-in user has admin role
-        if request.user.role != 'admin':
-            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
-
-        # Retrieve the comment by comment_id
-        try:
-            comment = Comment.objects.get(comment_id=comment_id)
-        except Comment.DoesNotExist:
-            return JsonResponse({'error': 'Comment not found'}, status=404)
-
-        # Serialize comment data
-        comment_data = {
-            'id': comment.comment_id,
-            'content': comment.content,
-            'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'updated_at': comment.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'user_id': comment.user_id.user_id,
-            'post_id': comment.post_id.post_id
-        }
-
-        return JsonResponse(comment_data, status=200)
-    
+                comment = Comment.objects.get(comment_id=comment_id)
+                serializer = CommentSerializer(comment)
+                return Response(serializer.data)
+            except Comment.DoesNotExist:
+                return Response({'error': 'Comment not found'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Retrieve all comments
+            comments = Comment.objects.all()
+            serializer = CommentSerializer(comments, many=True)
+            return Response(serializer.data)
     elif request.method == 'DELETE':
-        # Ensure the logged-in user has admin role
-        if request.user.role != 'admin':
-            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
-        
-        # Check if the comment exists
-        comment = Comment.objects.filter(comment_id=comment_id).first()
-        if not comment:
-            return JsonResponse({'error': 'Comment not found'}, status=404)
-        
-        # Delete the comment from the database
-        comment.delete()
-        
-        # Get the IP address of the user who added the new user
-        ip_address = request.META.get('REMOTE_ADDR')
-        # Create admin log
-        create_adminlogs(user=request.user, action='delete comment', ip_address=ip_address)
-        # Optionally, perform additional cleanup actions here
-        
-        return JsonResponse({'message': 'Comment deleted successfully', 'id': comment_id}, status=200)
-    
-    else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
+        if comment_id is not None:
+            # Delete an existing comment
+            try:
+                comment = Comment.objects.get(comment_id=comment_id)
+                ip_address = request.META.get('REMOTE_ADDR')
+                add_log('delete comment', ip_address)
+                comment.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            except Comment.DoesNotExist:
+                return Response({'error': 'Comment not found'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({'error': 'Please provide a comment_id'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 
+@api_view(['GET','PUT', 'DELETE'])
+def manage_tag(request, tag_id=None):
+    ip_address = request.META.get('REMOTE_ADDR')
 
-
-
-#manage tag
-# Get all tags
-@csrf_exempt
-@token_required
-def get_tags(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-    # Parse request parameters
-    sort_field, sort_order = request.GET.get('sort', 'tag_id,ASC').split(',')
-    filter_query = request.GET.get('filter', '{}')
-    range_header = request.headers.get('Range', '0-9')
-
-    # Process sort parameters
-    if sort_field == 'id':
-        sort_field = 'tag_id'
-    if sort_order not in ['ASC', 'DESC']:
-        sort_order = 'ASC'  # Default sorting order
-
-    # Process range parameters
-    start, end = map(int, range_header.split('-'))
-
-    # Build Q objects for filtering
-    q_objects = Q()
-    if filter_query:
-        filter_dict = eval(filter_query)  # Convert filter string to dictionary
-        if 'name' in filter_dict:
-            q_objects &= Q(name__icontains=filter_dict['name'])
-        if 'user__username' in filter_dict:
-            q_objects &= Q(user_id__username__icontains=filter_dict['user__username'])
-        if 'post__title' in filter_dict:
-            q_objects &= Q(post_id__title__icontains=filter_dict['post__title'])
-
-    # Perform the filtered query
-    tags_query = Tag.objects.filter(q_objects)
-
-    # Apply sorting order
-    sort_field = sort_field if sort_order == 'ASC' else f'-{sort_field}'  # Construct field name with sorting order
-    tags_query = tags_query.order_by(sort_field)
-
-    # Perform pagination
-    paginator = Paginator(tags_query, end - start + 1)
-    tags_page = paginator.get_page(start // (end - start + 1) + 1)
-
-    # Serialize tag data
-    tags_data = [{
-        'id': tag.tag_id,
-        'name': tag.name,
-        'user_id': tag.user_id.user_id,
-        'post_id': tag.post_id.post_id,
-        'status': tag.status
-    } for tag in tags_page]
-
-    # Prepare response
-    response = JsonResponse(tags_data, status=200, safe=False)
-    response['X-Total-Count'] = paginator.count
-    response['Content-Range'] = f'tags {start}-{end}/{paginator.count}'
-
-    return response
-
-
-
-# Get tag by tag_id
-@csrf_exempt
-@token_required
-def get_tag(request, tag_id):
     if request.method == 'GET':
-        # Ensure the logged-in user has admin role
-        if request.user.role != 'admin':
-            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
+        if tag_id is not None:
+            # Retrieve a specific tag by tag_id
+            try:
+                tag = Tag.objects.get(tag_id=tag_id)
+                serializer = TagSerializer(tag)
+                return Response(serializer.data)
+            except Tag.DoesNotExist:
+                return Response({'error': 'Tag not found'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Retrieve all tags
+            tags = Tag.objects.all()
+            serializer = TagSerializer(tags, many=True)
+            return Response(serializer.data)
 
-        # Retrieve the tag by tag_id
-        try:
-            tag = Tag.objects.get(tag_id=tag_id)
-        except Tag.DoesNotExist:
-            return JsonResponse({'error': 'Tag not found'}, status=404)
+    elif request.method == 'PUT':
+        if tag_id is not None:
+            # Update an existing tag
+            try:
+                tag = Tag.objects.get(tag_id=tag_id)
+                serializer = TagSerializer(tag, data=request.data)
+                if serializer.is_valid():
+                    serializer.save()
+                    add_log('update tag', ip_address)
+                    return Response(serializer.data)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            except Tag.DoesNotExist:
+                return Response({'error': 'Tag not found'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({'error': 'Please provide a tag_id'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Serialize tag data
-        tag_data = {
-            'id': tag.tag_id,
-            'name': tag.name,
-            'user_id': tag.user_id.user_id,
-            'post_id': tag.post_id.post_id,
-            'status': tag.status
-        }
-
-        return JsonResponse(tag_data, status=200)
-    
     elif request.method == 'DELETE':
-        # Ensure the logged-in user has admin role
-        if request.user.role != 'admin':
-            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
-        
-        # Check if the tag exists
-        tag = Tag.objects.filter(tag_id=tag_id).first()
-        if not tag:
-            return JsonResponse({'error': 'Tag not found'}, status=404)
-        
-        # Delete the tag from the database
-        tag.delete()
-        
-        # Get the IP address of the user who deleted the tag
-        ip_address = request.META.get('REMOTE_ADDR')
-        # Create admin log
-        create_adminlogs(user=request.user, action='delete tag', ip_address=ip_address)
-        
-        return JsonResponse({'message': 'Tag deleted successfully', 'id': tag_id}, status=200)
+        if tag_id is not None:
+            # Delete an existing tag
+            try:
+                tag = Tag.objects.get(tag_id=tag_id)
+                tag.delete()
+                add_log('delete tag', ip_address)
+                return Response({'message': 'Tag deleted successfully', 'id': tag_id}, status=status.HTTP_204_NO_CONTENT)
+            except Tag.DoesNotExist:
+                return Response({'error': 'Tag not found'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({'error': 'Please provide a tag_id'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+#manage_categories 
+@api_view(['GET', 'POST'])
+def manage_categories(request):
+    ip_address = request.META.get('REMOTE_ADDR')
     
-    elif request.method == 'POST':
-        # Ensure the logged-in user has admin role
-        if request.user.role != 'admin':
-            return JsonResponse({'error': 'Insufficient privileges'}, status=403)
-
-        # Parse request data
-        data = request.POST
-
-        # Retrieve the existing tag by tag_id
-        try:
-            existing_tag = Tag.objects.get(tag_id=tag_id)
-        except Tag.DoesNotExist:
-            return JsonResponse({'error': 'Tag not found'}, status=404)
-
-        # Retrieve the blog post by post_id
-        post_id = data.get('post_id')
-        try:
-            post = BlogPost.objects.get(post_id=post_id)
-        except BlogPost.DoesNotExist:
-            return JsonResponse({'error': 'Post not found'}, status=404)
-
-        # Extract and validate tag name
-        tag_name = data.get('name')
-        if not tag_name:
-            return JsonResponse({'error': 'Tag name is required'}, status=400)
-
-        # Extract and validate user_id
-        user_id = data.get('user_id')
-        try:
-            user = User.objects.get(user_id=user_id)
-        except User.DoesNotExist:
-            return JsonResponse({'error': 'User not found'}, status=404)
-
-        # Update the existing tag with new data
-        existing_tag.name = tag_name
-        existing_tag.user_id = user
-        existing_tag.post_id = post
-        existing_tag.save()
-
-        # Serialize updated tag data
-        tag_data = {
-            'id': existing_tag.tag_id,
-            'name': existing_tag.name,
-            'user_id': existing_tag.user_id.user_id,
-            'post_id': existing_tag.post_id.post_id,
-            'status': existing_tag.status
-        }
-
-        # Get the IP address of the user who updated the tag
-        ip_address = request.META.get('REMOTE_ADDR')
-        # Create admin log
-        create_adminlogs(user=request.user, action='update tag', ip_address=ip_address)
-
-        return JsonResponse(tag_data, status=200)
-    
-    else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-
-
-# Get all categories
-@csrf_exempt
-@token_required
-def get_categories(request):
     if request.method == 'GET':
-        # Parse request parameters
-        sort_field, sort_order = request.GET.get('sort', 'category_id,ASC').split(',')
-        filter_query = request.GET.get('filter', '{}')
-        range_header = request.headers.get('Range', '0-9')
-
-        # Process sort parameters
-        if sort_field == 'id':
-            sort_field = 'category_id'
-        if sort_order not in ['ASC', 'DESC']:
-            sort_order = 'ASC'  # Default sorting order
-
-        # Process range parameters
-        start, end = map(int, range_header.split('-'))
-
-        # Build Q objects for filtering
-        q_objects = Q()
-        if filter_query:
-            filter_dict = eval(filter_query)  # Convert filter string to dictionary
-            if 'name' in filter_dict:
-                q_objects &= Q(name__icontains=filter_dict['name'])
-
-        # Perform the filtered query
-        categories_query = Category.objects.filter(q_objects)
-
-        # Apply sorting order
-        sort_field = sort_field if sort_order == 'ASC' else f'-{sort_field}'  # Construct field name with sorting order
-        categories_query = categories_query.order_by(sort_field)
-
-        # Perform pagination
-        paginator = Paginator(categories_query, end - start + 1)
-        categories_page = paginator.get_page(start // (end - start + 1) + 1)
-
-        # Serialize category data
-        categories_data = [{
-            'id': category.category_id,
-            'name': category.name,
-        } for category in categories_page]
-
-        # Prepare response
-        response = JsonResponse(categories_data, status=200, safe=False)
-        response['X-Total-Count'] = paginator.count
-        response['Content-Range'] = f'categories {start}-{end}/{paginator.count}'
-
-        return response
+        categories = Category.objects.all()
+        serializer = CategorySerializer(categories, many=True)
+        return Response(serializer.data)
 
     elif request.method == 'POST':
-        # Extract data from the request
-        data = request.POST
-        name = data.get('name')
-
-        # Check if all required fields are provided
-        if not name:
-            return JsonResponse({'error': 'Name field is missing'}, status=400)
-
-        # Create the category
-        try:
-            new_category = Category.objects.create(
-                name=name
-            )
-            return JsonResponse({'id': new_category.category_id, 'name': name}, status=201)
-            
-        except ValidationError as e:
-            return JsonResponse({'error': e.messages}, status=400)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-
-    else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
+        serializer = CategorySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            add_log('create category', ip_address)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
+#manage_categories 
+@api_view(['GET', 'PUT', 'DELETE'])
+def manage_category(request, category_id):
+    try:
+        category = Category.objects.get(pk=category_id)
+    except Category.DoesNotExist:
+        return Response({'error': 'Category not found'}, status=status.HTTP_404_NOT_FOUND)
 
-@csrf_exempt
-@token_required
-def manage_category(request, category_id=None):
+    ip_address = request.META.get('REMOTE_ADDR')
+    
     if request.method == 'GET':
-        # Retrieve the category by category_id
-        try:
-            category = Category.objects.get(category_id=category_id)
-        except Category.DoesNotExist:
-            return JsonResponse({'error': 'Category not found'}, status=404)
+        serializer = CategorySerializer(category)
+        return Response(serializer.data)
 
-        # Serialize category data
-        category_data = {
-            'category_id': category.category_id,
-            'name': category.name
-        }
-
-        return JsonResponse(category_data, status=200)
+    elif request.method == 'PUT':
+        serializer = CategorySerializer(category, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            add_log('edit category', ip_address)
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
-        # Check if the category exists
-        category = Category.objects.filter(category_id=category_id).first()
-        if not category:
-            return JsonResponse({'error': 'Category not found'}, status=404)
-        
-        # Delete the category from the database
         category.delete()
-        return JsonResponse({'message': 'Category deleted successfully', 'category_id': category_id}, status=200)
+        add_log('delete category', ip_address)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
-    elif request.method == 'POST':
-        # Retrieve the category to update
-        try:
-            category = Category.objects.get(category_id=category_id)
-        except Category.DoesNotExist:
-            return JsonResponse({'error': 'Category not found'}, status=404)
 
-        # Parse request data
-        data = request.POST
 
-        # Update category name if provided in the request
-        category.name = data.get('name', category.name)
 
-        # Save the updated category
-        category.save()
-        return JsonResponse({'category_id': category.category_id, 'name': category.name}, status=200)
 
-    else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
