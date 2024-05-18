@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Home</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+
+        header {
+            background-color: #333;
+            color: white;
+            padding: 1em;
+        }
+
+        header nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header nav a {
+            color: white;
+            margin-right: 1em;
+            text-decoration: none;
+        }
+
+        header #auth a {
+            margin-right: 0;
+        }
+
+        main {
+            padding: 2em;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .category {
+            margin-bottom: 2em;
+        }
+
+        .category h2 {
+            background-color: #007bff;
+            color: white;
+            padding: 0.5em;
+            border-radius: 5px;
+        }
+
+        .posts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1em;
+        }
+
+        .post {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 1em;
+            width: calc(33.333% - 1em);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .post:hover {
+            transform: scale(1.02);
+        }
+
+        .post h3 {
+            margin-top: 0;
+            font-size: 1.2em;
+        }
+
+        .post a {
+            text-decoration: none;
+            color: #333;
+        }
+
+        .post a:hover {
+            text-decoration: underline;
+        }
+
+        .post img {
+            max-width: 100%;
+            border-radius: 5px;
+            margin-top: 0.5em;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <nav>
+            <div>
+                <a href="/">Home</a>
+                <a href="/categories/">Categories</a>
+                <a href="/about/">About</a>
+            </div>
+            <div id="auth">
+                <a href="/login/" id="login-link">Login</a>
+                <a href="/profile/" id="profile-link" style="display: none;">Profile</a>
+            </div>
+        </nav>
+    </header>
+    <main>
+        <h1>Categories and Posts</h1>
+        {% for category in categories %}
+        <div class="category">
+            <h2>{{ category.name }}</h2>
+            <div class="posts">
+                {% for post in category.blogpost_set.all %}
+                <div class="post">
+                    <h3><a href="#">{{ post.title }}</a></h3>
+                    {% if post.blog_images %}
+                    <img src="{{ post.blog_images.url }}" alt="{{ post.title }}">
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </main>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const loginLink = document.getElementById('login-link');
+            const profileLink = document.getElementById('profile-link');
+
+            function checkLoginStatus() {
+                const isLoggedIn = localStorage.getItem('token') !== null;
+                if (isLoggedIn) {
+                    loginLink.style.display = 'none';
+                    profileLink.style.display = 'inline';
+                } else {
+                    loginLink.style.display = 'inline';
+                    profileLink.style.display = 'none';
+                }
+            }
+
+            // Function to remove token from local storage
+            function removeToken() {
+                // localStorage.removeItem('token');
+                checkLoginStatus();
+            }
+
+            profileLink.addEventListener('click', function (event) {
+                event.preventDefault(); // Prevent default link behavior
+                removeToken(); // Remove token from local storage
+                window.location.href = '/profile/'; // Navigate to profile page
+            });
+
+            checkLoginStatus();
+        });
+    </script>
+
+
+</body>
+
+</html>
