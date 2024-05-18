@@ -38,7 +38,13 @@ def token_required(view_func):
 
     return wrapper
 
-
+#view home
+def home(request):
+    categories = Category.objects.all()
+    context = {
+        'categories': categories,
+    }
+    return render(request, 'home.html', context)
 
 
 # register user
@@ -895,8 +901,3 @@ def get_posts_by_tag(request, tag_name):
             return JsonResponse({'error': 'Tag not found'}, status=404)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-
-
-
-
