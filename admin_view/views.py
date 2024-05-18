@@ -125,13 +125,11 @@ def manage_logs(request, log_id=None):
             log = AdminLogs.objects.get(pk=log_id)
         except AdminLogs.DoesNotExist:
             return Response({'error': 'Log not found'}, status=status.HTTP_404_NOT_FOUND)
-        ip_address = request.META.get('REMOTE_ADDR')
-        add_log('delete log', ip_address)  # Log the action before deletion
         log.delete()
         return Response({'message': 'Log deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
 
 
-
+#manage post
 @api_view(['GET'])
 def manage_blog_posts(request):
     if request.method == 'GET':
@@ -141,7 +139,7 @@ def manage_blog_posts(request):
         return Response(serializer.data)
 
 
-
+#manage post
 @api_view(['GET', 'PUT', 'DELETE'])
 def manage_blog_post(request, post_id):
     try:
@@ -207,7 +205,7 @@ def manage_comment(request, comment_id=None):
             return Response({'error': 'Please provide a comment_id'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-
+#manage tag
 @api_view(['GET','PUT', 'DELETE'])
 def manage_tag(request, tag_id=None):
     ip_address = request.META.get('REMOTE_ADDR')

@@ -33,7 +33,7 @@ export const PostsList = (props: ListProps<any>) => {
                 <TextField source="title" label="Title" />
                 <ImageField source="blog_images" label="Image" />
                 <TextField source="created_at" label="Created At" />
-                <TextField source="user.username" label="User" />
+                <TextField source="user" label="User" />
                 <TextField source="status" label="Status" />
             </Datagrid>
         </List>
@@ -41,9 +41,7 @@ export const PostsList = (props: ListProps<any>) => {
 };
 
 export const PostEdit = () => {
-    // const { data: users, isLoading: usersLoading } = useGetList('users');
     const { data: categories, isLoading: categoriesLoading } = useGetList('category'); // مسیر صحیح برای دسته‌بندی‌ها
-    // const userChoices = users?.map(user => ({ id: user.id, name: user.username })) || [];
     const categoryChoices = categories?.map(category => ({ id: category.id, name: category.name })) || [];
     const record = useRecordContext();
 
@@ -58,7 +56,7 @@ export const PostEdit = () => {
                 <ImageInput source="blog_images" label="Image" accept="image/*">
                     <ImageField source="src" title="title" />
                 </ImageInput>
-                <TextField source="user.username" label="User" disabled />
+                <TextField source="user" label="User" />
 
                 <SelectInput 
                     source="category" 
