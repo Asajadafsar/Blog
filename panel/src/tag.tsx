@@ -12,8 +12,6 @@ import {
     SelectInput,
     useAuthenticated,
 } from 'react-admin';
-// Remove the duplicate import statement for List
-// import { List, Datagrid, TextField } from 'react-admin';
 
 const TagList = (props) => (
     <List {...props}>
@@ -30,7 +28,7 @@ const TagList = (props) => (
 
 
 const TagEdit: React.FC = (props) => {
-    useAuthenticated(); // Ensure user is authenticated before rendering
+    useAuthenticated();
 
     return (
         <Edit {...props}>
