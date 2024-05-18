@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>User Profile</title>
+</head>
+
+<body>
+    <h1>User Profile</h1>
+    <div id="profile-info">
+        <!-- User profile information will be displayed here -->
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Retrieve token from local storage
+            const token = localStorage.getItem('Authorization');
+
+            // Call profile API to fetch user information only if token exists
+            if (token) {
+                fetch('/profile/', {
+                    method: 'GET',  // Ensure it's a GET request
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` // Include token in the Authorization header
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            console.error('Error:', data.error);
+                        } else {
+                            // Display user information in the profile page
+                            const profileInfo = document.getElementById('profile-info');
+                            profileInfo.innerHTML = `
+                            <p>Username: ${data.username}</p>
+                            <p>Email: ${data.email}</p>
+                        `;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+            }
+        });
+    </script>
+</body>
+
+</html>

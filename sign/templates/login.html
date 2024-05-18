@@ -50,7 +50,7 @@
             // Check if user is already logged in (stored token in local storage)
             const token = localStorage.getItem('token');
             if (token) {
-                window.location.href = "/home/"; // Redirect to home page if logged in
+                window.location.href = ""; // Redirect to home page if logged in
             }
 
             $('#login-form').submit(function (event) {
@@ -78,12 +78,12 @@
                 // Submit the JSON data using AJAX
                 $.ajax({
                     type: 'POST',
-                    url: '/sign/login/',
+                    url: '/login/',
                     data: jsonData,
                     contentType: 'application/json', // Specify content type as JSON
                     success: function (response) {
                         localStorage.setItem('token', response.token); // Store token in local storage
-                        window.location.href = "/home/"; // Redirect to home page upon successful login
+                        window.location.href = ""; // Redirect to home page upon successful login
                     },
                     error: function (xhr, status, error) {
                         alert(xhr.responseText); // Display an alert with the error message
