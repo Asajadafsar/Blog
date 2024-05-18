@@ -2,11 +2,12 @@ from django.urls import path
 from .views import register_user, login_user,profile,edit_profile,reset_password,add_post,edit_post,user_posts
 from .views import add_comment,edit_comment,delete_post,display_post,delete_comment,add_deraf_post,edit_draft_post
 from .views import publish_draft_post,unpublish_post,display_draft_posts,search_active_posts,get_posts_by_category
-from .views import get_posts_by_tag
+from .views import get_posts_by_tag,home
 
 
 
 urlpatterns = [
+    path('', home, name='home'),
     path('register/', register_user, name='register_user'),
     path('login/', login_user, name='login_user'),
     path('profile/', profile, name='profile'),
