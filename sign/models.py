@@ -32,7 +32,7 @@ class BlogPost(models.Model):
     post_id = models.AutoField(primary_key=True)
     title = models.CharField(max_length=255)
     content = models.TextField()
-    image = models.ImageField(upload_to='blog_images/', blank=True, null=True)
+    blog_images = models.ImageField(upload_to='blog_images/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     user = models.ForeignKey('User', on_delete=models.CASCADE)
