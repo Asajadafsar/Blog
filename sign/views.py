@@ -329,7 +329,7 @@ def add_post(request):
             content = request.POST.get('content')
             category_name = request.POST.get('category_name')
             tags = request.POST.getlist('tags')
-            image = request.FILES.get('image')
+            blog_images = request.FILES.get('blog_images')  # Corrected to use 'blog_images'
 
             # Check if required fields are provided
             if not all([title, content, category_name]):
@@ -348,7 +348,7 @@ def add_post(request):
             new_post = BlogPost.objects.create(
                 title=title,
                 content=content,
-                image=image,
+                blog_images=blog_images,  # Use 'blog_images' here
                 user=user,
                 category=category
             )
@@ -359,11 +359,10 @@ def add_post(request):
                 tag, created = Tag.objects.get_or_create(name=tag_name, user_id=user, post_id=new_post)
 
             return JsonResponse({'success': 'Post added successfully'}, status=201)
-        except Exception as e:
+        except (ObjectDoesNotExist, IntegrityError) as e:
             return JsonResponse({'error': str(e)}, status=500)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-
 
 
 # edit post
