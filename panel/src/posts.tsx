@@ -31,7 +31,7 @@ export const PostsList = (props: ListProps<any>) => {
             <Datagrid rowClick="edit">
                 <TextField source="id" label="ID" />
                 <TextField source="title" label="Title" />
-                <ImageField source="image" label="Image" />
+                <ImageField source="blog_images" label="Image" />
                 <TextField source="created_at" label="Created At" />
                 <TextField source="user.username" label="User" />
                 <TextField source="status" label="Status" />
@@ -55,7 +55,7 @@ export const PostEdit = () => {
                 <TextInput source="title" validate={required()} label="Title" />
                 <TextInput source="content" validate={required()} label="content" />
 
-                <ImageInput source="image" label="Image" accept="image/*">
+                <ImageInput source="blog_images" label="Image" accept="image/*">
                     <ImageField source="src" title="title" />
                 </ImageInput>
                 <TextField source="user.username" label="User" disabled />
