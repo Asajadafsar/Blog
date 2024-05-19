@@ -3,47 +3,177 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Profile</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f7f7f7;
+            color: #333;
+            scroll-behavior: smooth;
+        }
+
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+        }
+
+        nav ul {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        nav ul li {
+            display: inline;
+            margin-right: 20px;
+        }
+
+        nav ul li a {
+            color: #fff;
+            text-decoration: none;
+        }
+
+        main {
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        input[type="text"],
+        input[type="email"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        input[type="file"] {
+            margin-top: 5px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .profile-picture {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 10px;
+            border: 2px solid #007bff;
+            /* Add border style */
+        }
+    </style>
 </head>
 
 <body>
-    <h1>User Profile</h1>
-    <div id="profile-info">
-        <!-- User profile information will be displayed here -->
-    </div>
+    <header>
+        <h1>Afsar Blog</h1>
+        <nav>
+            <ul>
+                <li><a href="http://localhost:8000/">Home</a></li>
+                <li><a href="#categories-section">Categories</a></li>
+                <li><a href="http://localhost:8000/profile">Profile</a></li>
+                <li><a href="http://localhost:8000/add_post">add post</a></li>
+
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <h1>User Profile</h1>
+        <ul>
+            <li><strong>Username:</strong> {{ user.username }}</li>
+            <li><strong>Email:</strong> {{ user.email }}</li>
+            <li><strong>Phone Number:</strong> {{ user.phone_number }}</li>
+            {% if user.profile_picture %}
+            <li><strong>Profile Picture:</strong> <img src="{{ user.profile_picture.url }}" alt="Profile Picture"
+                    class="profile-picture"></li>
+            {% endif %}
+        </ul>
+        <form id="profileForm">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" value="{{ user.username }}">
+
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" value="{{ user.email }}">
+
+            <label for="phone_number">Phone Number:</label>
+            <input type="text" id="phone_number" name="phone_number" value="{{ user.phone_number }}">
+
+            <!-- New password field -->
+            <label for="new_password">New Password:</label>
+            <input type="password" id="new_password" name="new_password">
+
+            <button type="button" onclick="updateProfile()">Update Profile</button>
+        </form>
+    </main>
 
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            // Retrieve token from local storage
-            const token = localStorage.getItem('Authorization');
+        function updateProfile() {
+            var form = document.getElementById('profileForm');
+            var formData = new FormData(form);
 
-            // Call profile API to fetch user information only if token exists
-            if (token) {
-                fetch('/profile/', {
-                    method: 'GET',  // Ensure it's a GET request
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}` // Include token in the Authorization header
-                    }
+            // Convert FormData to JSON object
+            var jsonObject = {};
+            formData.forEach(function (value, key) {
+                jsonObject[key] = value;
+            });
+
+            fetch('/profile/', {
+                method: 'POST',
+                body: JSON.stringify(jsonObject),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
                 })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.error) {
-                            console.error('Error:', data.error);
-                        } else {
-                            // Display user information in the profile page
-                            const profileInfo = document.getElementById('profile-info');
-                            profileInfo.innerHTML = `
-                            <p>Username: ${data.username}</p>
-                            <p>Email: ${data.email}</p>
-                        `;
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                    });
-            }
-        });
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
     </script>
 </body>
 

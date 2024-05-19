@@ -1,100 +1,107 @@
-{% load static %}
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Login</title>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f7f7f7;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
 
-    <!-- MATERIAL DESIGN ICONIC FONT -->
-    <link rel="stylesheet"
-        href="{% static 'fonts/material-design-iconic-font/css/material-design-iconic-font.min.css' %}">
+        .login-container {
+            background-color: #fff;
+            padding: 40px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            text-align: center;
+            width: 300px;
+        }
 
-    <!-- STYLE CSS -->
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
 
-    <!-- JQUERY -->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            text-align: left;
+        }
 
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #333;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #555;
+        }
+
+        .error-message {
+            color: red;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
 </head>
-
 <body>
-
-    <div class="wrapper" style="background-image: url('{% static 'images/bg-registration-form-1.jpg' %}');">
-        <div class="inner">
-            <div class="image-holder">
-                <img src="{% static 'images/registration-form-1.jpg' %}" alt="">
-            </div>
-            <form id="login-form">
-                <h3>Login Form</h3>
-                <div class="form-group">
-                    <input type="text" id="username" placeholder="Username or Email" class="form-control"
-                        name="username" required>
-                </div>
-                <div class="form-wrapper">
-                    <input type="password" id="password" placeholder="Password" class="form-control" name="password"
-                        required>
-                    <i class="zmdi zmdi-lock"></i>
-                </div>
-                <button type="submit">Login
-                    <i class="zmdi zmdi-arrow-right"></i>
-                </button>
-            </form>
-
-        </div>
+    <div class="login-container">
+        <h1>Login</h1>
+        <form id="loginForm">
+            <label for="username">Username or Email:</label>
+            <input type="text" id="username" name="username" required>
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+            <button type="button" onclick="login()">Login</button>
+        </form>
+        <div class="error-message" id="errorMessage">Login failed! Please check your credentials.</div>
     </div>
 
     <script>
-        $(document).ready(function () {
-            // Check if user is already logged in (stored token in local storage)
-            const token = localStorage.getItem('token');
-            if (token) {
-                window.location.href = ""; // Redirect to home page if logged in
-            }
+        async function login() {
+            const form = document.getElementById('loginForm');
+            const data = {
+                username: form.username.value,
+                password: form.password.value
+            };
 
-            $('#login-form').submit(function (event) {
-                event.preventDefault(); // Prevent the form from submitting normally
-
-                // Get the values of username and password fields
-                var username = $('#username').val().trim();
-                var password = $('#password').val().trim();
-
-                // Validate if the fields are not empty
-                if (username === '' || password === '') {
-                    alert('Username and password are required!');
-                    return;
-                }
-
-                // Construct JSON object with form data
-                var formData = {
-                    username: username,
-                    password: password
-                };
-
-                // Convert JSON object to string
-                var jsonData = JSON.stringify(formData);
-
-                // Submit the JSON data using AJAX
-                $.ajax({
-                    type: 'POST',
-                    url: '/login/',
-                    data: jsonData,
-                    contentType: 'application/json', // Specify content type as JSON
-                    success: function (response) {
-                        localStorage.setItem('token', response.token); // Store token in local storage
-                        window.location.href = ""; // Redirect to home page upon successful login
-                    },
-                    error: function (xhr, status, error) {
-                        alert(xhr.responseText); // Display an alert with the error message
-                    }
-                });
+            const response = await fetch('{% url "login_user" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
             });
-        });
 
-
+            if (response.ok) {
+                window.location.href = '{% url "home" %}';
+            } else {
+                document.getElementById('errorMessage').style.display = 'block';
+            }
+        }
     </script>
-
 </body>
-
 </html>

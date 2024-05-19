@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Post</title>
+</head>
+<body>
+    <h1>Add Post</h1>
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label for="title">Title:</label><br>
+        <input type="text" id="title" name="title" required><br><br>
+        
+        <label for="content">Content:</label><br>
+        <textarea id="content" name="content" rows="4" cols="50" required></textarea><br><br>
+        
+        <label for="category">Category:</label><br>
+        <select id="category" name="category" required>
+            {% for category in categories %}
+                <option value="{{ category.category_id }}">{{ category.name }}</option>
+            {% endfor %}
+        </select><br><br>
+        
+        <label for="status">Status:</label><br>
+        <select id="status" name="status" required>
+            <option value="active">Active</option>
+            <option value="draft">Draft</option>
+        </select><br><br>
+        
+        <label for="blog_images">Upload Image:</label><br>
+        <input type="file" id="blog_images" name="blog_images"><br><br>
+        
+        <button type="submit">Add Post</button>
+    </form>
+</body>
+</html>

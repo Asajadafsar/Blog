@@ -257,7 +257,7 @@ def user_posts(request):
                 'id': post.post_id,
                 'title': post.title,
                 'category': post.category.name,
-                'image': post.image.url if post.image else None,
+                'blog_images': post.blog_images.url if post.blog_images else None,
                 'tags': tag_names,
                 'status': post.status  # Include the status field in the response
             }
@@ -308,7 +308,7 @@ def display_post(request, post_id):
             post_data = {
                 'title': post.title,
                 'content': post.content,
-                'image': post.image.url if post.image else None,
+                'blog_images': post.blog_images.url if post.blog_images else None,
                 'created_at': post.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                 'comments': serialized_comments,  # Include comments in the response
                 'tags': serialized_tags  # Include tags in the response
@@ -589,7 +589,7 @@ def add_deraf_post(request):
             content = request.POST.get('content')
             category_name = request.POST.get('category_name')
             tags = request.POST.getlist('tags')
-            image = request.FILES.get('image')
+            blog_images = request.FILES.get('blog_images')
 
             # Check if required fields are provided
             if not all([title, content, category_name]):
@@ -608,7 +608,7 @@ def add_deraf_post(request):
             new_post = BlogPost.objects.create(
                 title=title,
                 content=content,
-                image=image,
+                blog_images=blog_images,
                 user=user,
                 category=category,
                 status='draft' 
@@ -777,7 +777,7 @@ def display_draft_posts(request):
                 'title': post.title,
                 'content': post.content,
                 'tags': serialized_tags,
-                'image': post.image.url if post.image else None
+                'blog_images': post.blog_images.url if post.blog_images else None
             }
 
             serialized_draft_posts.append(post_data)
@@ -823,7 +823,7 @@ def search_active_posts(request):
                 'post_id': post.post_id,
                 'title': post.title,
                 'category': post.category.name,
-                'image': post.image.url if post.image else None,
+                'blog_images': post.blog_images.url if post.blog_images else None,
                 'tags': serialized_tags
             }
 
@@ -855,7 +855,7 @@ def get_posts_by_category(request, category_id):
                 post_data = {
                     'post_id': post.post_id,
                     'title': post.title,
-                    'image': post.image.url if post.image else None,
+                    'blog_images': post.blog_images.url if post.blog_images else None,
                     'user': post.user.username,
                     'category': post.category.name,
                 }
@@ -890,7 +890,7 @@ def get_posts_by_tag(request, tag_name):
             for post in posts:
                 post_data = {
                     'title': post.title,
-                    'image': post.image.url if post.image else None,
+                    'blog_images': post.blog_images.url if post.blog_images else None,
                     'user': post.user.username,
                     'category': post.category.name
                 }

@@ -70,33 +70,28 @@ def add_log(action, ip_address):
 
 
 
+
 #view all user and add user
+# View to manage users: view all and add new users
 @api_view(['GET', 'POST'])
 def manage_users(request):
     if request.method == "GET":
         # Get parameters with default values if not provided
         range = request.GET.get("range", "[0, 10]")
-        sort = request.GET.get("sort", '["id", "ASC"]')
         filter = request.GET.get("filter", "")
 
         # Parse JSON strings
         final_range = json.loads(range)
-        final_sort = json.loads(sort)
 
         # Extracting search term
         search = regex(filter)
         if search is None:
             search = ""
 
-        # Handle sorting
-        if final_sort[1] == "DESC":
-            users = User.objects.all().filter(Q(username__icontains=search)).order_by("-{}".format(final_sort[0]))[
-                final_range[0]: final_range[1]
-            ]
-        else:
-            users = User.objects.all().filter(Q(username__icontains=search)).order_by(final_sort[0])[
-                final_range[0]: final_range[1]
-            ]
+        # Handle search
+        users = User.objects.all().filter(Q(username__icontains=search))[
+            final_range[0]: final_range[1]
+        ]
 
         # Serialize data
         serializer = UserSerializer(users, many=True)
@@ -116,7 +111,7 @@ def manage_users(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
- 
+
 
 
 #edit and delete ann get user_id
