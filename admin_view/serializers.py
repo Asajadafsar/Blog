@@ -51,28 +51,30 @@ class TagSerializer(serializers.ModelSerializer):
         model = Tag
         fields = ['id', 'name', 'username', 'post_title', 'status']
 
+
 class BlogPostSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source='post_id', read_only=True)
     category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=False)
-    user = serializers.SlugRelatedField(slug_field='username', queryset=User.objects.all(), required=False)
-    image = serializers.ImageField(required=False)
-    tags = TagSerializer(many=True, read_only=True) 
-    
+    user = serializers.CharField(source='user.username', read_only=True)
+
+    blog_images = serializers.ImageField(required=False)
+    tags = TagSerializer(many=True, read_only=True)
+
     class Meta:
         model = BlogPost
-        fields = ['id', 'title', 'content', 'image', 'created_at', 'updated_at', 'user', 'category', 'status', 'tags']
-        read_only_fields = ['created_at', 'updated_at', 'user', 'status' , 'tags']
+        fields = ['id', 'title', 'content', 'blog_images', 'created_at', 'updated_at', 'user', 'category', 'status', 'tags']
+        read_only_fields = ['created_at', 'updated_at', 'user', 'tags']
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         request = self.context.get('request')
-        if instance.image:
+        if instance.blog_images:
             if request is not None:
-                host = request.get_host()
-                representation['image'] = request.build_absolute_uri(instance.image.url)
+                representation['blog_images'] = request.build_absolute_uri(instance.blog_images.url)
             else:
-                representation['image'] = f"{settings.DEFAULT_HOST}{instance.image.url}"
+                representation['blog_images'] = f"{settings.DEFAULT_HOST}{instance.blog_images.url}"
         return representation
+
 
 
 class CommentSerializer(serializers.ModelSerializer):

@@ -1,3 +1,4 @@
+/* eslint-disable react/jsx-key */
 import * as React from 'react';
 import {
     List,
@@ -18,16 +19,26 @@ import {
     Show,
     ShowProps,
     SimpleShowLayout,
+    FilterButton,
+    FilterForm,
+    SearchInput,
 } from 'react-admin';
 import { Stack } from '@mui/material';
 
-const ListToolbar = () => (
-    <Stack direction="row" justifyContent="space-between">
-        <div>
-        </div>
-    </Stack>
-);
 
+const CustomerFilters = [
+    <SearchInput source="username" alwaysOn placeholder="username" />,
+  ];
+  const ListToolbar = () => (
+    <Stack direction="row" justifyContent="space-between">
+      <FilterForm filters={CustomerFilters} />
+      <div>
+        <FilterButton filters={CustomerFilters} />
+      </div>
+    </Stack>
+  );
+
+  
 export const UsersList = (props: ListProps<any>) => {
     const { data, ids, total } = useListContext();
 

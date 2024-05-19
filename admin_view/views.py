@@ -1,3 +1,5 @@
+import json
+import re
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -24,6 +26,7 @@ from django.utils import timezone
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from .serializers import AdminLogsSerializer,BlogPostSerializer,CategorySerializer,BlogPostSerializer,CommentSerializer,TagSerializer
+from django.db.models import Q
 
 
 
@@ -52,7 +55,14 @@ def token_required(view_func):
 
     return wrapper
 
-
+def regex(text):
+    if len(text) > 2:
+        search = re.split(r""":""", text)
+        search2 = re.split(r"""^{\"""", search[0])
+        search2 = re.split(r"""\"$""", search2[1])
+        regex_filter = re.split(rf'"{search2[0]}":"(.*?)"', text)
+        return regex_filter[1]
+    
 
 #add log def
 def add_log(action, ip_address):
@@ -63,12 +73,39 @@ def add_log(action, ip_address):
 #view all user and add user
 @api_view(['GET', 'POST'])
 def manage_users(request):
-    if request.method == 'GET':
-        # Your existing GET logic here
-        users = User.objects.all()
-        serializer = UserSerializer(users, many=True)
-        return Response(serializer.data)
+    if request.method == "GET":
+        # Get parameters with default values if not provided
+        range = request.GET.get("range", "[0, 10]")
+        sort = request.GET.get("sort", '["id", "ASC"]')
+        filter = request.GET.get("filter", "")
 
+        # Parse JSON strings
+        final_range = json.loads(range)
+        final_sort = json.loads(sort)
+
+        # Extracting search term
+        search = regex(filter)
+        if search is None:
+            search = ""
+
+        # Handle sorting
+        if final_sort[1] == "DESC":
+            users = User.objects.all().filter(Q(username__icontains=search)).order_by("-{}".format(final_sort[0]))[
+                final_range[0]: final_range[1]
+            ]
+        else:
+            users = User.objects.all().filter(Q(username__icontains=search)).order_by(final_sort[0])[
+                final_range[0]: final_range[1]
+            ]
+
+        # Serialize data
+        serializer = UserSerializer(users, many=True)
+
+        # Set response headers
+        response = Response(serializer.data)
+        response["Content-Range"] = f"posts {final_range[0]}-{final_range[1]-1}/{len(users)}"
+        response["Access-Control-Expose-Headers"] = "Content-Range"
+        return response
     elif request.method == 'POST':
         # Your existing POST logic here
         serializer = UserSerializer(data=request.data)
@@ -129,14 +166,36 @@ def manage_logs(request, log_id=None):
         return Response({'message': 'Log deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
 
 
+
+
+
 #manage post
 @api_view(['GET'])
 def manage_blog_posts(request):
     if request.method == 'GET':
-        # Retrieve all blog posts
-        blog_posts = BlogPost.objects.all()
-        serializer = BlogPostSerializer(blog_posts, many=True)
-        return Response(serializer.data)
+        range = request.GET.get("range")
+        sort = request.GET.get("sort")
+        filter = request.GET.get("filter")
+        search = regex(filter)
+        if search is None:
+            search = ""
+
+        final_range = json.loads(range)
+        final_sort = json.loads(sort)
+        if final_sort[1] == "DESC":
+            posts = BlogPost.objects.filter(Q(title__icontains=search)).order_by("-{}".format(final_sort[0]))[
+                final_range[0] : final_range[1]
+            ]
+        else:
+            posts = BlogPost.objects.filter(Q(title__icontains=search)).order_by(final_sort[0])[
+                final_range[0] : final_range[1]
+            ]
+
+        serializer = BlogPostSerializer(posts, many=True)
+        response = Response(serializer.data)
+        response["Content-Range"] = f"posts {final_range[0]}-{final_range[1]-1}/{len(posts)}"
+        response["Access-Control-Expose-Headers"] = "Content-Range"
+        return response
 
 
 #manage post

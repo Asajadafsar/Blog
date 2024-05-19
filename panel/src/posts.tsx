@@ -1,3 +1,4 @@
+/* eslint-disable react/jsx-key */
 import * as React from 'react';
 import {
     List,
@@ -16,15 +17,23 @@ import {
     ImageInput,
     useGetList,
     useRecordContext,
+    FilterForm,
+    FilterButton,
+    SearchInput,
 } from 'react-admin';
 import { Stack } from '@mui/material';
 
-const ListToolbar = () => (
+const CustomerFilters = [
+    <SearchInput source="title" alwaysOn placeholder="Title" />,
+  ];
+  const ListToolbar = () => (
     <Stack direction="row" justifyContent="space-between">
-        <div></div>
+      <FilterForm filters={CustomerFilters} />
+      <div>
+        <FilterButton filters={CustomerFilters} />
+      </div>
     </Stack>
-);
-
+  );
 export const PostsList = (props: ListProps<any>) => {
     return (
         <List {...props} filters={<ListToolbar />} pagination={<Pagination rowsPerPageOptions={[10, 25, 50]} />} perPage={10}>

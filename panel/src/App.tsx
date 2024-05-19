@@ -34,7 +34,6 @@ export const App = () => (
       name="posts"
       list={PostsList}
       edit={PostEdit}
-
     />
     <Resource
       name="comment"
