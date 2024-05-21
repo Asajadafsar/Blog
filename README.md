@@ -10,7 +10,6 @@ The Awesome Blog Project is a blog application designed to facilitate the creati
 - **Frontend**: HTML, CSS,JS
 - **Database**: SQLite(Django)
 - **admin-panel**: react/typescript(react-admin)
-- **Design Prototyping**: Figma
 
 ## Project Diagram
 [Activity-ERD-C4-Sequence-State Diagrams by mermaid and generate AI UML](https://mermaid.js.org/)
@@ -18,8 +17,6 @@ The Awesome Blog Project is a blog application designed to facilitate the creati
 ## Database
 The database system was designed with SQLite Studio software. You can download the executable file for SQLite Studio [here](https://sqlitestudio.pl/).
 
-## Design Prototyping with Figma
-[Figma Design Prototype]()
 
 ### Project Setup Guide
 
@@ -39,7 +36,7 @@ Follow these simple steps to set up and run the project smoothly:
 
 4. **Run the Application**: To run the application, navigate to the project's root directory and enter the following command:
    ```
-   python app.py
+   python manage.py runserver
    ```
 
 5. **Launch Admin Panel**: Then, to launch the admin panel, go to the `shop-admin` directory and enter the following command:
